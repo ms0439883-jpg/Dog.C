@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>毛緣配對 — 寵物認養</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,500;0,700;1,300&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  /* ── 基礎 ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --cream: #FFF8F0;
+    --warm-bg: #FDF2E8;
+    --card-bg: #FFFAF6;
+    --orange: #E07040;
+    --orange-light: #FDE8D8;
+    --orange-dark: #A03C1A;
+    --brown: #3D2314;
+    --brown-mid: #7A4A30;
+    --brown-light: #B08070;
+    --green: #2A7A40;
+    --green-bg: #E8F5E8;
+    --red: #CC3030;
+    --red-bg: #FFECEC;
+    --blue: #2060A0;
+    --blue-bg: #DDEEFF;
+    --border: rgba(61,35,20,0.12);
+    --radius: 20px;
+    --shadow: 0 8px 32px rgba(61,35,20,0.14);
+  }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    min-height: 100vh;
+    color: var(--brown);
+  }
+
+  /* ── 通用 ── */
+  .hidden { display: none !important; }
+  button { font-family: inherit; cursor: pointer; border: none; outline: none; }
+  input, select { font-family: inherit; outline: none; }
+  a { color: var(--orange); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── 載入畫面 ── */
+  #loading-screen {
+    position: fixed; inset: 0;
+    background: var(--cream);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 1000;
+    gap: 16px;
+  }
+  #loading-screen .logo-big {
+    font-family: 'Fraunces', serif;
+    font-size: 36px; font-weight: 700;
+    color: var(--brown);
+  }
+  #loading-screen .logo-big span { color: var(--orange); }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--orange-light);
+    border-top-color: var(--orange);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── 登入頁 ── */
+  #auth-screen {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    background: var(--cream);
+  }
+  .auth-card {
+    background: white;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 40px 36px;
+    width: 100%; max-width: 420px;
+    box-shadow: var(--shadow);
+  }
+  .auth-logo {
+    font-family: 'Fraunces', serif;
+    font-size: 32px; font-weight: 700;
+    color: var(--brown); text-align: center;
+    margin-bottom: 6px;
+  }
+  .auth-logo span { color: var(--orange); }
+  .auth-tagline {
+    text-align: center; color: var(--brown-light);
+    font-size: 14px; margin-bottom: 32px;
+    font-style: italic;
+    font-family: 'Fraunces', serif;
+  }
+  .auth-tabs {
+    display: flex; gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .auth-tab {
+    flex: 1; padding: 10px;
+    background: white; color: var(--brown-light);
+    font-size: 14px; font-weight: 500;
+    border: none; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .auth-tab.active {
+    background: var(--orange);
+    color: white;
+  }
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block; font-size: 13px;
+    font-weight: 500; color: var(--brown-mid);
+    margin-bottom: 6px;
+  }
+  .form-group input {
+    width: 100%; padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px; font-size: 15px;
+    background: var(--warm-bg);
+    color: var(--brown);
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus { border-color: var(--orange); background: white; }
+  .auth-btn {
+    width: 100%; padding: 14px;
+    background: var(--orange); color: white;
+    font-size: 15px; font-weight: 600;
+    border-radius: 12px; cursor: pointer;
+    border: none; transition: opacity 0.2s;
+    margin-top: 4px;
+  }
+  .auth-btn:hover { opacity: 0.9; }
+  .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .auth-error {
+    background: var(--red-bg); color: var(--red);
+    border-radius: 10px; padding: 10px 14px;
+    font-size: 13px; margin-top: 12px;
+  }
+  .setup-notice {
+    background: var(--blue-bg); color: var(--blue);
+    border-radius: 12px; padding: 14px 16px;
+    font-size: 13px; line-height: 1.6;
+    margin-bottom: 24px;
+  }
+  .setup-notice strong { display: block; margin-bottom: 4px; font-size: 14px; }
+  .setup-notice code {
+    background: rgba(32,96,160,0.1);
+    padding: 1px 5px; border-radius: 4px;
+    font-family: monospace; font-size: 12px;
+  }
+
+  /* ── 設定 Supabase ── */
+  #config-screen {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .config-card {
+    background: white; border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 36px; width: 100%; max-width: 480px;
+    box-shadow: var(--shadow);
+  }
+  .config-title {
+    font-family: 'Fraunces', serif;
+    font-size: 22px; font-weight: 700;
+    color: var(--brown); margin-bottom: 8px;
+  }
+  .config-subtitle {
+    font-size: 14px; color: var(--brown-light);
+    margin-bottom: 24px; line-height: 1.6;
+  }
+  .step-list {
+    counter-reset: step;
+    list-style: none; margin-bottom: 24px;
+  }
+  .step-list li {
+    counter-increment: step;
+    display: flex; gap: 12px;
+    margin-bottom: 12px; font-size: 14px;
+    line-height: 1.6; color: var(--brown-mid);
+  }
+  .step-list li::before {
+    content: counter(step);
+    min-width: 24px; height: 24px;
+    background: var(--orange-light); color: var(--orange-dark);
+    border-radius: 50%; display: flex;
+    align-items: center; justify-content: center;
+    font-weight: 600; font-size: 12px;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .step-list code {
+    background: var(--warm-bg); padding: 1px 6px;
+    border-radius: 4px; font-family: monospace;
+    font-size: 12px; color: var(--orange-dark);
+  }
+  .config-skip {
+    text-align: center; margin-top: 16px;
+    font-size: 13px; color: var(--brown-light);
+  }
+  .config-skip button {
+    background: none; border: none;
+    color: var(--orange); cursor: pointer;
+    font-size: 13px; text-decoration: underline;
+  }
+
+  /* ── 主應用 ── */
+  #app-screen { min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── 頂部欄 ── */
+  .top-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,248,240,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex; align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .logo {
+    font-family: 'Fraunces', serif;
+    font-size: 22px; font-weight: 700;
+    color: var(--brown); white-space: nowrap;
+  }
+  .logo span { color: var(--orange); }
+
+  .filter-row {
+    display: flex; gap: 8px; align-items: center;
+    flex: 1; justify-content: center;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 6px 14px;
+    border-radius: 20px; font-size: 13px;
+    font-weight: 500; border: 1.5px solid var(--border);
+    background: white; color: var(--brown-mid);
+    transition: all 0.15s; cursor: pointer;
+  }
+  .filter-btn.active {
+    background: var(--brown); color: white;
+    border-color: var(--brown);
+  }
+  .filter-select {
+    padding: 6px 12px; border-radius: 20px;
+    font-size: 13px; font-weight: 500;
+    border: 1.5px solid var(--border);
+    background: white; color: var(--brown-mid);
+    cursor: pointer;
+  }
+  .filter-select:focus { border-color: var(--orange); }
+
+  .user-menu {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .user-avatar {
+    width: 34px; height: 34px;
+    background: var(--orange-light);
+    border-radius: 50%; display: flex;
+    align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600;
+    color: var(--orange-dark); cursor: pointer;
+    position: relative;
+  }
+  .liked-badge {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--orange); color: white;
+    border-radius: 50%; width: 16px; height: 16px;
+    font-size: 10px; display: flex;
+    align-items: center; justify-content: center;
+    font-weight: 700;
+  }
+  .icon-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%; background: white;
+    border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--brown-mid); cursor: pointer;
+    font-size: 16px; transition: all 0.15s;
+  }
+  .icon-btn:hover { background: var(--warm-bg); }
+
+  /* ── 主內容區 ── */
+  .main-content {
+    flex: 1; display: flex;
+    flex-direction: column; align-items: center;
+    padding: 24px 16px 40px;
+    gap: 20px;
+  }
+
+  /* ── API 狀態條 ── */
+  .api-status {
+    width: 100%; max-width: 420px;
+    border-radius: 12px; padding: 10px 16px;
+    font-size: 13px; display: flex;
+    align-items: center; gap: 8px;
+  }
+  .api-status.loading { background: var(--orange-light); color: var(--orange-dark); }
+  .api-status.success { background: var(--green-bg); color: var(--green); }
+  .api-status.error { background: var(--red-bg); color: var(--red); }
+
+  /* ── 卡片堆疊 ── */
+  .card-stack-wrap {
+    width: 100%; max-width: 420px;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 20px;
+  }
+
+  .card-stack {
+    position: relative;
+    width: 100%; height: 520px;
+  }
+
+  /* ── 寵物卡片 ── */
+  .pet-card {
+    position: absolute; inset: 0;
+    border-radius: var(--radius);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    cursor: grab; user-select: none;
+    transform-origin: center 90%;
+    will-change: transform;
+    transition: box-shadow 0.2s;
+  }
+  .pet-card:active { cursor: grabbing; }
+  .pet-card.z2 { z-index: 3; box-shadow: var(--shadow); }
+  .pet-card.z1 { z-index: 2; transform: scale(0.96) translateY(8px); pointer-events: none; }
+  .pet-card.z0 { z-index: 1; transform: scale(0.92) translateY(16px); pointer-events: none; }
+
+  .card-photo {
+    width: 100%; height: 58%;
+    object-fit: cover; display: block;
+  }
+  .card-photo-placeholder {
+    width: 100%; height: 58%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 96px; flex-shrink: 0;
+  }
+
+  .card-body {
+    padding: 16px 20px 14px;
+    display: flex; flex-direction: column; gap: 10px;
+    height: 42%;
+  }
+  .card-row1 {
+    display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 8px;
+  }
+  .pet-name {
+    font-family: 'Fraunces', serif;
+    font-size: 26px; font-weight: 700;
+    color: var(--brown); line-height: 1.1;
+  }
+  .pet-meta {
+    font-size: 13px; color: var(--brown-light);
+    margin-top: 4px;
+  }
+  .src-badge {
+    font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .src-gov { background: var(--blue-bg); color: var(--blue); }
+  .src-shelter { background: var(--green-bg); color: var(--green); }
+  .src-rescue { background: var(--orange-light); color: var(--orange-dark); }
+
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag {
+    font-size: 12px; font-weight: 500;
+    padding: 3px 10px; border-radius: 10px;
+    background: var(--warm-bg); color: var(--brown-mid);
+  }
+  .tag.green { background: var(--green-bg); color: var(--green); }
+  .tag.orange { background: var(--orange-light); color: var(--orange-dark); }
+
+  .card-footer {
+    display: flex; align-items: center;
+    justify-content: space-between; margin-top: auto;
+  }
+  .loc { font-size: 12px; color: var(--brown-light); display: flex; align-items: center; gap: 4px; }
+  .adopt-link {
+    font-size: 12px; font-weight: 600;
+    color: var(--orange); display: flex;
+    align-items: center; gap: 3px;
+  }
+
+  /* ── 滑動提示 ── */
+  .swipe-label {
+    position: absolute; top: 24px;
+    font-family: 'Fraunces', serif;
+    font-size: 26px; font-weight: 700;
+    padding: 6px 16px; border-radius: 12px;
+    border: 3px solid; opacity: 0;
+    pointer-events: none; z-index: 10;
+    transition: opacity 0.08s;
+  }
+  .label-like { left: 20px; color: var(--green); border-color: var(--green); background: rgba(42,122,64,0.08); }
+  .label-nope { right: 20px; color: var(--red); border-color: var(--red); background: rgba(204,48,48,0.08); }
+
+  /* ── 操作按鈕 ── */
+  .action-row {
+    display: flex; align-items: center;
+    justify-content: center; gap: 20px;
+  }
+  .act-btn {
+    width: 64px; height: 64px;
+    border-radius: 50%; background: white;
+    border: 1.5px solid var(--border);
+    display: flex; align-items: center;
+    justify-content: center; font-size: 26px;
+    cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .act-btn:hover { transform: scale(1.08); }
+  .act-btn:active { transform: scale(0.94); }
+  .act-btn.nope { color: var(--red); box-shadow: 0 4px 16px rgba(204,48,48,0.15); }
+  .act-btn.like { color: var(--green); box-shadow: 0 4px 16px rgba(42,122,64,0.15); }
+  .act-btn.info { color: var(--orange); width: 48px; height: 48px; font-size: 20px; }
+  .act-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+  /* ── 動畫 ── */
+  .fly-right { animation: flyRight 0.36s ease forwards; }
+  .fly-left  { animation: flyLeft  0.36s ease forwards; }
+  @keyframes flyRight { to { transform: translateX(130%) rotate(22deg); opacity: 0; } }
+  @keyframes flyLeft  { to { transform: translateX(-130%) rotate(-22deg); opacity: 0; } }
+
+  /* ── 收藏列 ── */
+  .liked-shelf {
+    width: 100%; max-width: 420px;
+    background: white; border-radius: 16px;
+    border: 1px solid var(--border); padding: 16px;
+  }
+  .shelf-title {
+    font-size: 12px; font-weight: 600;
+    color: var(--brown-light); letter-spacing: 0.06em;
+    text-transform: uppercase; margin-bottom: 12px;
+    display: flex; align-items: center;
+    justify-content: space-between;
+  }
+  .shelf-title a { font-size: 12px; text-transform: none; letter-spacing: 0; }
+  .shelf-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .shelf-thumb {
+    width: 48px; height: 48px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; cursor: pointer;
+    border: 2.5px solid var(--orange);
+    background: var(--orange-light);
+    transition: transform 0.15s;
+    position: relative;
+  }
+  .shelf-thumb:hover { transform: scale(1.1); }
+  .shelf-name {
+    font-size: 10px; text-align: center;
+    color: var(--brown-mid); margin-top: 4px;
+    max-width: 48px;
+  }
+  .shelf-item { display: flex; flex-direction: column; align-items: center; }
+
+  /* ── 空狀態 ── */
+  .empty-state {
+    text-align: center; padding: 60px 20px;
+    color: var(--brown-light);
+    font-family: 'Fraunces', serif;
+    font-style: italic; font-size: 18px;
+    line-height: 1.7;
+  }
+  .empty-icon { font-size: 64px; display: block; margin-bottom: 16px; }
+
+  /* ── 詳情抽屜 ── */
+  .drawer-overlay {
+    position: fixed; inset: 0;
+    background: rgba(61,35,20,0.4);
+    z-index: 200; display: flex;
+    align-items: flex-end; justify-content: center;
+    padding: 0;
+  }
+  .drawer {
+    background: white; border-radius: 24px 24px 0 0;
+    width: 100%; max-width: 480px;
+    max-height: 82vh; overflow-y: auto;
+    padding: 24px 24px 40px;
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .drawer-handle {
+    width: 40px; height: 4px;
+    background: var(--border); border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+  .drawer-photo {
+    width: 100%; height: 220px;
+    object-fit: cover; border-radius: 16px;
+    display: block; margin-bottom: 16px;
+  }
+  .drawer-photo-ph {
+    width: 100%; height: 220px;
+    border-radius: 16px; display: flex;
+    align-items: center; justify-content: center;
+    font-size: 80px; margin-bottom: 16px;
+  }
+  .drawer-name {
+    font-family: 'Fraunces', serif;
+    font-size: 28px; font-weight: 700;
+    color: var(--brown); margin-bottom: 4px;
+  }
+  .drawer-breed { font-size: 15px; color: var(--brown-light); margin-bottom: 16px; }
+  .drawer-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 20px;
+  }
+  .drawer-cell {
+    background: var(--warm-bg); border-radius: 12px;
+    padding: 12px; font-size: 13px;
+  }
+  .drawer-cell .label { color: var(--brown-light); margin-bottom: 2px; font-size: 12px; }
+  .drawer-cell .val { font-weight: 600; color: var(--brown); }
+  .drawer-desc {
+    font-size: 14px; line-height: 1.7;
+    color: var(--brown-mid); margin-bottom: 20px;
+  }
+  .drawer-actions { display: flex; gap: 10px; }
+  .btn-adopt {
+    flex: 1; padding: 14px;
+    background: var(--orange); color: white;
+    font-size: 15px; font-weight: 600;
+    border-radius: 14px; border: none;
+    cursor: pointer; display: flex;
+    align-items: center; justify-content: center; gap: 6px;
+    transition: opacity 0.2s;
+  }
+  .btn-adopt:hover { opacity: 0.88; }
+  .btn-drawer-like {
+    padding: 14px 20px;
+    background: var(--green-bg); color: var(--green);
+    font-size: 22px; border-radius: 14px;
+    border: none; cursor: pointer; transition: opacity 0.2s;
+  }
+  .btn-drawer-nope {
+    padding: 14px 20px;
+    background: var(--red-bg); color: var(--red);
+    font-size: 22px; border-radius: 14px;
+    border: none; cursor: pointer; transition: opacity 0.2s;
+  }
+
+  /* ── 收藏頁面 ── */
+  #saved-screen {
+    min-height: 100vh; background: var(--cream);
+  }
+  .saved-header {
+    padding: 20px 20px 16px;
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--border);
+    background: white;
+  }
+  .saved-title {
+    font-family: 'Fraunces', serif;
+    font-size: 22px; font-weight: 700;
+    color: var(--brown);
+  }
+  .saved-grid {
+    padding: 20px; display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+  }
+  .saved-card {
+    background: white; border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden; cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .saved-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .saved-card-img {
+    width: 100%; height: 120px;
+    object-fit: cover; display: block;
+  }
+  .saved-card-ph {
+    width: 100%; height: 120px;
+    display: flex; align-items: center;
+    justify-content: center; font-size: 52px;
+  }
+  .saved-card-info { padding: 10px 12px; }
+  .saved-card-name {
+    font-family: 'Fraunces', serif;
+    font-weight: 600; font-size: 16px;
+    color: var(--brown);
+  }
+  .saved-card-meta { font-size: 12px; color: var(--brown-light); margin-top: 2px; }
+  .remove-btn {
+    position: absolute; top: 8px; right: 8px;
+    width: 26px; height: 26px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 50%; border: none;
+    cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    font-size: 14px; color: var(--red);
+  }
+
+  /* ── 響應式 ── */
+  @media (max-width: 480px) {
+    .top-bar { padding: 10px 14px; }
+    .logo { font-size: 18px; }
+    .filter-btn { font-size: 12px; padding: 5px 12px; }
+    .main-content { padding: 16px 12px 32px; }
+    .card-stack { height: 480px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 載入畫面 -->
+<div id="loading-screen">
+  <div class="logo-big">毛緣<span>配對</span></div>
+  <div class="spinner"></div>
+  <div style="font-size:13px; color: var(--brown-light);">載入中...</div>
+</div>
+
+<!-- 設定畫面 (未填 Supabase) -->
+<div id="config-screen" class="hidden">
+  <div class="config-card">
+    <div class="config-title">🐾 設定帳號系統</div>
+    <div class="config-subtitle">毛緣配對需要 Supabase 來儲存您的收藏。只需 2 分鐘，完全免費！</div>
+    <ol class="step-list">
+      <li>前往 <a href="https://supabase.com" target="_blank">supabase.com</a>，免費建立帳號並新增專案</li>
+      <li>在專案的 <strong>Settings → API</strong> 找到 <code>Project URL</code> 和 <code>anon public</code> 金鑰</li>
+      <li>在 <strong>SQL Editor</strong> 執行以下建表指令：</li>
+    </ol>
+    <div style="background: var(--warm-bg); border-radius: 12px; padding: 12px 14px; font-family: monospace; font-size: 11px; color: var(--brown-mid); margin-bottom: 20px; line-height: 1.8; overflow-x: auto;">
+      CREATE TABLE liked_pets (<br>
+      &nbsp;&nbsp;id uuid DEFAULT gen_random_uuid() PRIMARY KEY,<br>
+      &nbsp;&nbsp;user_id uuid REFERENCES auth.users NOT NULL,<br>
+      &nbsp;&nbsp;animal_id text NOT NULL,<br>
+      &nbsp;&nbsp;pet_data jsonb,<br>
+      &nbsp;&nbsp;created_at timestamptz DEFAULT now(),<br>
+      &nbsp;&nbsp;UNIQUE(user_id, animal_id)<br>
+      );<br>
+      ALTER TABLE liked_pets ENABLE ROW LEVEL SECURITY;<br>
+      CREATE POLICY "Users manage own likes" ON liked_pets<br>
+      &nbsp;&nbsp;USING (auth.uid() = user_id)<br>
+      &nbsp;&nbsp;WITH CHECK (auth.uid() = user_id);
+    </div>
+    <div class="form-group">
+      <label>Supabase Project URL</label>
+      <input type="url" id="cfg-url" placeholder="https://xxxx.supabase.co">
+    </div>
+    <div class="form-group">
+      <label>Supabase Anon Key</label>
+      <input type="text" id="cfg-key" placeholder="eyJhbGciOi...">
+    </div>
+    <button class="auth-btn" onclick="saveConfig()">儲存並繼續</button>
+    <div class="config-skip">
+      或 <button onclick="skipConfig()">先試用（不儲存資料）</button>
+    </div>
+  </div>
+</div>
+
+<!-- 登入畫面 -->
+<div id="auth-screen" class="hidden">
+  <div class="auth-card">
+    <div class="auth-logo">毛緣<span>配對</span></div>
+    <div class="auth-tagline">幫每隻毛孩找到有緣人</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">登入</button>
+      <button class="auth-tab" onclick="switchTab('register')">註冊</button>
+    </div>
+
+    <div id="login-form">
+      <div class="form-group">
+        <label>電子信箱</label>
+        <input type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>密碼</label>
+        <input type="password" id="login-pwd" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="auth-btn" id="login-btn" onclick="doLogin()">登入</button>
+    </div>
+
+    <div id="register-form" class="hidden">
+      <div class="form-group">
+        <label>電子信箱</label>
+        <input type="email" id="reg-email" placeholder="your@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>密碼（至少 6 位）</label>
+        <input type="password" id="reg-pwd" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <button class="auth-btn" id="reg-btn" onclick="doRegister()">建立帳號</button>
+    </div>
+
+    <div id="auth-error" class="auth-error hidden"></div>
+    <div id="auth-success" class="auth-error hidden" style="background: var(--green-bg); color: var(--green);"></div>
+
+    <div style="text-align:center; margin-top:16px; font-size:12px; color: var(--brown-light);">
+      <button onclick="guestMode()" style="background:none; border:none; cursor:pointer; color: var(--orange); font-size:12px; text-decoration: underline;">訪客模式（不儲存）</button>
+    </div>
+  </div>
+</div>
+
+<!-- 主畫面 -->
+<div id="app-screen" class="hidden">
+
+  <div class="top-bar">
+    <div class="logo">毛緣<span>配對</span></div>
+
+    <div class="filter-row">
+      <button class="filter-btn active" data-kind="all" onclick="setKindFilter(this, 'all')">全部</button>
+      <button class="filter-btn" data-kind="犬" onclick="setKindFilter(this, '犬')">🐶 犬</button>
+      <button class="filter-btn" data-kind="貓" onclick="setKindFilter(this, '貓')">🐱 貓</button>
+      <button class="filter-btn" data-kind="other" onclick="setKindFilter(this, 'other')">🐾 其他</button>
+      <select class="filter-select" id="area-filter" onchange="setAreaFilter(this.value)">
+        <option value="all">全台</option>
+      </select>
+    </div>
+
+    <div class="user-menu">
+      <button class="icon-btn" title="查看收藏" onclick="showSaved()">
+        <i class="ti ti-heart"></i>
+      </button>
+      <div class="user-avatar" title="帳號" onclick="toggleUserMenu()" id="avatar-btn">
+        <span id="avatar-letter">?</span>
+        <div class="liked-badge hidden" id="liked-badge">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-content">
+
+    <div id="api-status" class="api-status loading">
+      <div class="spinner" style="width:16px; height:16px; border-width:2px;"></div>
+      <span>從農業部載入認養資料...</span>
+    </div>
+
+    <div class="card-stack-wrap">
+      <div class="card-stack" id="card-stack">
+        <!-- 卡片由 JS 產生 -->
+      </div>
+
+      <div class="action-row">
+        <button class="act-btn nope" id="btn-nope" onclick="doSwipe('nope')" disabled title="跳過">
+          <i class="ti ti-x"></i>
+        </button>
+        <button class="act-btn info" id="btn-info" onclick="openDrawer(currentIndex)" disabled title="詳情">
+          <i class="ti ti-info-circle"></i>
+        </button>
+        <button class="act-btn like" id="btn-like" onclick="doSwipe('like')" disabled title="有興趣！">
+          <i class="ti ti-heart"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="liked-shelf hidden" id="liked-shelf">
+      <div class="shelf-title">
+        <span>已感興趣的毛孩</span>
+        <a href="#" onclick="showSaved(); return false;">查看全部 →</a>
+      </div>
+      <div class="shelf-row" id="shelf-row"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 詳情抽屜 -->
+<div class="drawer-overlay hidden" id="drawer-overlay" onclick="closeDrawer(event)">
+  <div class="drawer" id="drawer-content"></div>
+</div>
+
+<!-- 收藏頁面 -->
+<div id="saved-screen" class="hidden">
+  <div class="saved-header">
+    <button class="icon-btn" onclick="hideSaved()"><i class="ti ti-arrow-left"></i></button>
+    <div class="saved-title">已收藏的毛孩</div>
+  </div>
+  <div class="saved-grid" id="saved-grid"></div>
+</div>
+
+<!-- 用戶選單 -->
+<div id="user-menu-popup" class="hidden" style="
+  position: fixed; top: 60px; right: 16px; z-index: 300;
+  background: white; border-radius: 14px;
+  border: 1px solid var(--border); padding: 8px;
+  box-shadow: var(--shadow); min-width: 160px;">
+  <div id="menu-email" style="padding: 8px 12px; font-size: 12px; color: var(--brown-light); border-bottom: 1px solid var(--border); margin-bottom: 4px;"></div>
+  <button onclick="doLogout()" style="
+    width: 100%; padding: 8px 12px; background: none; border: none;
+    text-align: left; cursor: pointer; font-size: 14px; color: var(--red);
+    border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+    <i class="ti ti-logout"></i> 登出
+  </button>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// 設定
+// ══════════════════════════════════════════════
+const SUPABASE_URL_KEY = 'maoyuan_sb_url';
+const SUPABASE_KEY_KEY = 'maoyang_sb_key';
+const API_URL = 'https://data.moa.gov.tw/Service/OpenData/TransService.aspx?UnitId=QcbUEzN6E6DL&IsTransData=1';
+const PROXY = 'https://corsproxy.io/?';
+
+let sbClient = null;
+let currentUser = null;
+let guestModeOn = false;
+
+// 動物資料
+let allPets = [];
+let filteredPets = [];
+let currentIndex = 0;
+let kindFilter = 'all';
+let areaFilter = 'all';
+
+// 收藏
+let likedSet = new Set(); // animal_id
+let likedData = {};       // animal_id -> pet obj
+
+// ══════════════════════════════════════════════
+// 初始化
+// ══════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async () => {
+  const sbUrl = localStorage.getItem(SUPABASE_URL_KEY);
+  const sbKey = localStorage.getItem(SUPABASE_KEY_KEY);
+
+  if (sbUrl && sbKey) {
+    try {
+      sbClient = window.supabase.createClient(sbUrl, sbKey);
+      await initWithSupabase();
+    } catch(e) {
+      showScreen('config-screen');
+    }
+  } else {
+    showScreen('config-screen');
+  }
+  document.getElementById('loading-screen').classList.add('hidden');
+});
+
+async function initWithSupabase() {
+  const { data: { session } } = await sbClient.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    await initApp();
+  } else {
+    showScreen('auth-screen');
+  }
+}
+
+// ══════════════════════════════════════════════
+// 設定
+// ══════════════════════════════════════════════
+function saveConfig() {
+  const url = document.getElementById('cfg-url').value.trim();
+  const key = document.getElementById('cfg-key').value.trim();
+  if (!url || !key) return alert('請填入完整的 URL 和 Key');
+  localStorage.setItem(SUPABASE_URL_KEY, url);
+  localStorage.setItem(SUPABASE_KEY_KEY, key);
+  sbClient = window.supabase.createClient(url, key);
+  showScreen('auth-screen');
+}
+
+function skipConfig() {
+  guestModeOn = true;
+  initApp();
+}
+
+// ══════════════════════════════════════════════
+// 登入 / 登出
+// ══════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0) === (tab==='login')));
+  document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+  clearAuthMsg();
+}
+
+async function doLogin() {
+  if (!sbClient) return;
+  const email = document.getElementById('login-email').value.trim();
+  const pwd   = document.getElementById('login-pwd').value;
+  const btn   = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = '登入中...';
+  const { data, error } = await sbClient.auth.signInWithPassword({ email, password: pwd });
+  if (error) { showAuthError(error.message); btn.disabled = false; btn.textContent = '登入'; return; }
+  currentUser = data.user;
+  initApp();
+}
+
+async function doRegister() {
+  if (!sbClient) return;
+  const email = document.getElementById('reg-email').value.trim();
+  const pwd   = document.getElementById('reg-pwd').value;
+  const btn   = document.getElementById('reg-btn');
+  btn.disabled = true; btn.textContent = '建立中...';
+  const { data, error } = await sbClient.auth.signUp({ email, password: pwd });
+  if (error) { showAuthError(error.message); btn.disabled = false; btn.textContent = '建立帳號'; return; }
+  showAuthSuccess('帳號建立成功！請確認信箱後登入');
+  btn.disabled = false; btn.textContent = '建立帳號';
+}
+
+async function doLogout() {
+  if (sbClient) await sbClient.auth.signOut();
+  currentUser = null; guestModeOn = false;
+  likedSet.clear(); likedData = {};
+  toggleUserMenu(true);
+  showScreen('auth-screen');
+}
+
+function guestMode() {
+  guestModeOn = true;
+  initApp();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.classList.remove('hidden');
+  document.getElementById('auth-success').classList.add('hidden');
+}
+function showAuthSuccess(msg) {
+  const el = document.getElementById('auth-success');
+  el.textContent = msg; el.classList.remove('hidden');
+  document.getElementById('auth-error').classList.add('hidden');
+}
+function clearAuthMsg() {
+  document.getElementById('auth-error').classList.add('hidden');
+  document.getElementById('auth-success').classList.add('hidden');
+}
+
+// ══════════════════════════════════════════════
+// 主 App 初始化
+// ══════════════════════════════════════════════
+async function initApp() {
+  showScreen('app-screen');
+
+  // 頭像
+  if (currentUser) {
+    const letter = (currentUser.email || 'G')[0].toUpperCase();
+    document.getElementById('avatar-letter').textContent = letter;
+    document.getElementById('menu-email').textContent = currentUser.email;
+  } else {
+    document.getElementById('avatar-letter').textContent = '訪';
+    document.getElementById('menu-email').textContent = '訪客模式';
+  }
+
+  // 載入收藏
+  await loadLiked();
+
+  // 載入動物資料
+  await loadPets();
+}
+
+// ══════════════════════════════════════════════
+// 農業部 API
+// ══════════════════════════════════════════════
+async function loadPets() {
+  setApiStatus('loading', '從農業部載入認養資料...');
+  try {
+    const res = await fetch(PROXY + encodeURIComponent(API_URL));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const raw = await res.json();
+    allPets = raw
+      .filter(a => a.animal_status === 'OPEN')
+      .map(normalizePet);
+    populateAreaFilter();
+    applyFilters();
+    setApiStatus('success', `已載入 ${allPets.length} 隻待認養毛孩（農業部公開資料）`);
+  } catch(e) {
+    setApiStatus('error', '無法連接資料來源，顯示示範資料');
+    allPets = getDemoPets();
+    populateAreaFilter();
+    applyFilters();
+  }
+}
+
+function normalizePet(a) {
+  const kindRaw = (a.animal_kind || '').trim();
+  const kind = kindRaw.includes('犬') ? '犬' : kindRaw.includes('貓') ? '貓' : '其他';
+  const emoji = kind === '犬' ? '🐶' : kind === '貓' ? '🐱' : '🐾';
+  const sexMap = { M: '男生', F: '女生', N: '未知' };
+  const bgMap = { '犬': '#FFF0E0', '貓': '#F0F0FF', '其他': '#F0FFF0' };
+
+  // 處理照片
+  let photo = null;
+  if (a.album_file) {
+    const files = a.album_file.split(';').filter(Boolean);
+    if (files.length > 0) photo = files[0];
+  }
+
+  // 縣市
+  const shelter = (a.shelter_name || '').trim();
+  const area = extractArea(a.animal_area_pkid, shelter);
+
+  const tags = [];
+  if (a.animal_sterilization === 'Y') tags.push({ t: '已結紮', c: 'green' });
+  if (a.animal_bacterin === 'Y') tags.push({ t: '已打狂犬病疫苗', c: 'green' });
+  const bodytype = a.animal_bodytype;
+  if (bodytype) tags.push({ t: bodytype, c: '' });
+
+  return {
+    id: String(a.animal_id),
+    name: a.animal_title || `${kind}咪 #${a.animal_subid}`,
+    kind, emoji,
+    breed: (a.animal_Variety || kindRaw || '待認養').trim(),
+    sex: sexMap[a.animal_sex] || '未知',
+    colour: a.animal_colour || '',
+    area, shelter,
+    shelterAddr: a.shelter_address || '',
+    shelterTel: a.shelter_tel || '',
+    tags,
+    photo,
+    bg: bgMap[kind],
+    foundplace: a.animal_foundplace || '',
+    remark: a.animal_remark || a.animal_caption || '',
+    opendate: a.animal_opendate ? a.animal_opendate.slice(0,10) : '',
+    url: `https://animal.moa.gov.tw/Frontend/AnnounceMent/AnnounceMentInfo?id=${a.animal_id}`,
+  };
+}
+
+const AREA_MAP = {
+  '63': '台北市', '65': '新北市', '68': '桃園市', '10018': '新竹市',
+  '10004': '新竹縣', '10005': '苗栗縣', '66': '台中市', '10007': '彰化縣',
+  '10008': '南投縣', '10009': '雲林縣', '10010': '嘉義縣', '10020': '嘉義市',
+  '67': '台南市', '64': '高雄市', '10013': '屏東縣', '10017': '宜蘭縣',
+  '10015': '花蓮縣', '10014': '台東縣', '10016': '澎湖縣', '09007': '金門縣', '09020': '連江縣'
+};
+
+function extractArea(pkid, shelter) {
+  if (AREA_MAP[pkid]) return AREA_MAP[pkid];
+  for (const [,v] of Object.entries(AREA_MAP)) {
+    if (shelter.includes(v)) return v;
+  }
+  return shelter.slice(0,3) || '未知';
+}
+
+function populateAreaFilter() {
+  const areas = [...new Set(allPets.map(p => p.area))].sort();
+  const sel = document.getElementById('area-filter');
+  sel.innerHTML = '<option value="all">全台</option>';
+  areas.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a; opt.textContent = a;
+    sel.appendChild(opt);
+  });
+}
+
+// ══════════════════════════════════════════════
+// 篩選
+// ══════════════════════════════════════════════
+function setKindFilter(btn, kind) {
+  kindFilter = kind;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function setAreaFilter(val) {
+  areaFilter = val;
+  applyFilters();
+}
+
+function applyFilters() {
+  filteredPets = allPets.filter(p => {
+    if (kindFilter !== 'all') {
+      if (kindFilter === 'other') { if (p.kind === '犬' || p.kind === '貓') return false; }
+      else if (p.kind !== kindFilter) return false;
+    }
+    if (areaFilter !== 'all' && p.area !== areaFilter) return false;
+    return true;
+  });
+  // 打亂順序，避免每次都同樣排列
+  for (let i = filteredPets.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [filteredPets[i], filteredPets[j]] = [filteredPets[j], filteredPets[i]];
+  }
+  currentIndex = 0;
+  renderStack();
+}
+
+// ══════════════════════════════════════════════
+// 渲染卡片
+// ══════════════════════════════════════════════
+function renderStack() {
+  const stack = document.getElementById('card-stack');
+  stack.innerHTML = '';
+
+  const remaining = filteredPets.slice(currentIndex);
+  enableButtons(remaining.length > 0);
+
+  if (remaining.length === 0) {
+    stack.innerHTML = `<div class="empty-state"><span class="empty-icon">🎉</span>這個條件下的毛孩都看完了！<br>換個篩選條件，或稍後再來。</div>`;
+    return;
+  }
+
+  const count = Math.min(3, remaining.length);
+  for (let i = count - 1; i >= 0; i--) {
+    const card = buildCard(remaining[i], i);
+    stack.appendChild(card);
+  }
+
+  const front = stack.querySelector('.z2');
+  if (front) attachDrag(front);
+}
+
+function buildCard(pet, layerIdx) {
+  const card = document.createElement('div');
+  card.className = `pet-card z${2 - layerIdx}`;
+  card.dataset.id = pet.id;
+
+  const photoHtml = pet.photo
+    ? `<img class="card-photo" src="${pet.photo}" alt="${pet.name}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+       <div class="card-photo-placeholder" style="background:${pet.bg}; display:none">${pet.emoji}</div>`
+    : `<div class="card-photo-placeholder" style="background:${pet.bg}">${pet.emoji}</div>`;
+
+  const tagsHtml = pet.tags.slice(0,3).map(t =>
+    `<span class="tag ${t.c}">${t.t}</span>`).join('');
+
+  card.innerHTML = `
+    ${photoHtml}
+    <div class="card-body">
+      <div class="card-row1">
+        <div>
+          <div class="pet-name">${pet.name}</div>
+          <div class="pet-meta">${pet.breed} · ${pet.sex}</div>
+        </div>
+        <span class="src-badge src-gov">公立收容所</span>
+      </div>
+      <div class="tags">${tagsHtml}${pet.colour ? `<span class="tag">${pet.colour}</span>` : ''}</div>
+      <div class="card-footer">
+        <span class="loc"><i class="ti ti-map-pin" style="font-size:13px"></i>${pet.area} · ${pet.shelter.replace('動物之家','').replace('動物保護防疫處','')}</span>
+        <a href="${pet.url}" class="adopt-link" target="_blank" onclick="event.stopPropagation()">認養頁面 <i class="ti ti-external-link" style="font-size:12px"></i></a>
+      </div>
+    </div>
+    <div class="swipe-label label-like">❤️ 有緣</div>
+    <div class="swipe-label label-nope">✕ 跳過</div>
+  `;
+  return card;
+}
+
+// ══════════════════════════════════════════════
+// 拖曳
+// ══════════════════════════════════════════════
+let isDragging = false, startX = 0, startY = 0, curX = 0;
+
+function attachDrag(card) {
+  card.addEventListener('mousedown', onStart);
+  card.addEventListener('touchstart', onStart, { passive: true });
+
+  function onStart(e) {
+    isDragging = true; curX = 0;
+    card.classList.add('dragging');
+    card.style.transition = 'none';
+    const p = e.touches ? e.touches[0] : e;
+    startX = p.clientX; startY = p.clientY;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('touchmove', onMove, { passive: true });
+    document.addEventListener('mouseup', onEnd);
+    document.addEventListener('touchend', onEnd);
+  }
+
+  function onMove(e) {
+    if (!isDragging) return;
+    const p = e.touches ? e.touches[0] : e;
+    curX = p.clientX - startX;
+    const curY = (p.clientY - startY) * 0.3;
+    card.style.transform = `translateX(${curX}px) translateY(${curY}px) rotate(${curX * 0.07}deg)`;
+    const th = 60;
+    card.querySelector('.label-like').style.opacity = curX > th ? Math.min(1, (curX-th)/60) : 0;
+    card.querySelector('.label-nope').style.opacity = curX < -th ? Math.min(1, (-curX-th)/60) : 0;
+  }
+
+  function onEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('mouseup', onEnd);
+    document.removeEventListener('touchend', onEnd);
+    card.classList.remove('dragging');
+    if (curX > 100) { doSwipe('like'); }
+    else if (curX < -100) { doSwipe('nope'); }
+    else {
+      card.style.transition = 'transform 0.3s cubic-bezier(.25,.8,.25,1)';
+      card.style.transform = '';
+      card.querySelector('.label-like').style.opacity = 0;
+      card.querySelector('.label-nope').style.opacity = 0;
+    }
+    curX = 0;
+  }
+}
+
+// ══════════════════════════════════════════════
+// 滑動
+// ══════════════════════════════════════════════
+async function doSwipe(dir) {
+  const pet = filteredPets[currentIndex];
+  if (!pet) return;
+
+  const card = document.querySelector('.pet-card.z2');
+  if (card) {
+    card.style.transition = 'none';
+    card.classList.add(dir === 'like' ? 'fly-right' : 'fly-left');
+  }
+
+  if (dir === 'like') {
+    await saveLike(pet);
+    updateShelf();
+  }
+
+  currentIndex++;
+  setTimeout(renderStack, 360);
+}
+
+// ══════════════════════════════════════════════
+// 收藏
+// ══════════════════════════════════════════════
+async function loadLiked() {
+  if (!sbClient || !currentUser) return;
+  const { data, error } = await sbClient
+    .from('liked_pets')
+    .select('animal_id, pet_data')
+    .eq('user_id', currentUser.id);
+  if (data) {
+    data.forEach(r => {
+      likedSet.add(r.animal_id);
+      likedData[r.animal_id] = r.pet_data;
+    });
+    updateShelf();
+  }
+}
+
+async function saveLike(pet) {
+  likedSet.add(pet.id);
+  likedData[pet.id] = pet;
+
+  if (sbClient && currentUser) {
+    await sbClient.from('liked_pets').upsert({
+      user_id: currentUser.id,
+      animal_id: pet.id,
+      pet_data: pet
+    });
+  }
+
+  const badge = document.getElementById('liked-badge');
+  badge.textContent = likedSet.size;
+  badge.classList.remove('hidden');
+}
+
+async function removeLike(id) {
+  likedSet.delete(id);
+  delete likedData[id];
+
+  if (sbClient && currentUser) {
+    await sbClient.from('liked_pets')
+      .delete()
+      .eq('user_id', currentUser.id)
+      .eq('animal_id', id);
+  }
+
+  const badge = document.getElementById('liked-badge');
+  badge.textContent = likedSet.size;
+  if (likedSet.size === 0) badge.classList.add('hidden');
+  updateShelf();
+  renderSavedGrid();
+}
+
+function updateShelf() {
+  const shelf = document.getElementById('liked-shelf');
+  const row = document.getElementById('shelf-row');
+  const pets = Object.values(likedData).slice(-8);
+
+  if (pets.length === 0) { shelf.classList.add('hidden'); return; }
+  shelf.classList.remove('hidden');
+  row.innerHTML = pets.map(p => `
+    <div class="shelf-item" onclick="openDrawerFromSaved('${p.id}')">
+      <div class="shelf-thumb">${p.emoji}</div>
+      <div class="shelf-name">${p.name}</div>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════════
+// 詳情抽屜
+// ══════════════════════════════════════════════
+function openDrawer(idx) {
+  const pet = filteredPets[idx];
+  if (!pet) return;
+  renderDrawer(pet);
+}
+
+function openDrawerFromSaved(id) {
+  const pet = likedData[id] || filteredPets.find(p => p.id === id);
+  if (!pet) return;
+  renderDrawer(pet);
+}
+
+function renderDrawer(pet) {
+  const overlay = document.getElementById('drawer-overlay');
+  const content = document.getElementById('drawer-content');
+  const isLiked = likedSet.has(pet.id);
+
+  const photoHtml = pet.photo
+    ? `<img class="drawer-photo" src="${pet.photo}" alt="${pet.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+       <div class="drawer-photo-ph" style="background:${pet.bg}; display:none">${pet.emoji}</div>`
+    : `<div class="drawer-photo-ph" style="background:${pet.bg}">${pet.emoji}</div>`;
+
+  const tagsHtml = pet.tags.map(t => `<span class="tag ${t.c}">${t.t}</span>`).join('');
+
+  content.innerHTML = `
+    <div class="drawer-handle"></div>
+    ${photoHtml}
+    <div class="drawer-name">${pet.name}</div>
+    <div class="drawer-breed">${pet.breed} · ${pet.sex}${pet.colour ? ' · ' + pet.colour : ''}</div>
+    <div class="drawer-grid">
+      <div class="drawer-cell"><div class="label">收容所</div><div class="val">${pet.shelter}</div></div>
+      <div class="drawer-cell"><div class="label">地區</div><div class="val">${pet.area}</div></div>
+      <div class="drawer-cell"><div class="label">聯絡電話</div><div class="val">${pet.shelterTel || '—'}</div></div>
+      <div class="drawer-cell"><div class="label">開放認養</div><div class="val">${pet.opendate || '—'}</div></div>
+    </div>
+    ${pet.foundplace ? `<div class="drawer-desc"><strong>尋獲地：</strong>${pet.foundplace}</div>` : ''}
+    ${pet.remark ? `<div class="drawer-desc">${pet.remark}</div>` : ''}
+    <div class="tags" style="margin-bottom:20px">${tagsHtml}</div>
+    <div class="drawer-actions">
+      <button class="btn-drawer-nope" onclick="drawSwipe('${pet.id}','nope')">${isLiked ? '🗑 移除' : '✕ 跳過'}</button>
+      <button class="btn-adopt" onclick="openLink('${pet.url}')">
+        <i class="ti ti-external-link"></i> 前往認養頁面
+      </button>
+      <button class="btn-drawer-like" onclick="drawSwipe('${pet.id}','like')">${isLiked ? '❤️ 已收藏' : '❤️ 有興趣'}</button>
+    </div>
+  `;
+  overlay.classList.remove('hidden');
+}
+
+function closeDrawer(e) {
+  if (e.target === document.getElementById('drawer-overlay')) {
+    document.getElementById('drawer-overlay').classList.add('hidden');
+  }
+}
+
+async function drawSwipe(id, dir) {
+  document.getElementById('drawer-overlay').classList.add('hidden');
+  if (dir === 'like') {
+    const pet = filteredPets.find(p => p.id === id) || likedData[id];
+    if (pet) await saveLike(pet);
+    updateShelf();
+  } else {
+    await removeLike(id);
+  }
+  // 移到下一張
+  if (filteredPets[currentIndex]?.id === id) {
+    currentIndex++;
+    renderStack();
+  }
+}
+
+function openLink(url) {
+  window.open(url, '_blank');
+}
+
+// ══════════════════════════════════════════════
+// 收藏頁
+// ══════════════════════════════════════════════
+function showSaved() {
+  renderSavedGrid();
+  document.getElementById('saved-screen').classList.remove('hidden');
+}
+function hideSaved() {
+  document.getElementById('saved-screen').classList.add('hidden');
+}
+function renderSavedGrid() {
+  const grid = document.getElementById('saved-grid');
+  const pets = Object.values(likedData);
+  if (pets.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><span class="empty-icon">🤍</span>還沒有收藏的毛孩</div>';
+    return;
+  }
+  grid.innerHTML = pets.map(p => `
+    <div class="saved-card" style="position:relative" onclick="renderDrawer(likedData['${p.id}'])">
+      ${p.photo
+        ? `<img class="saved-card-img" src="${p.photo}" alt="${p.name}" onerror="this.outerHTML='<div class=saved-card-ph style=background:${p.bg}>${p.emoji}</div>'">`
+        : `<div class="saved-card-ph" style="background:${p.bg}">${p.emoji}</div>`}
+      <div class="saved-card-info">
+        <div class="saved-card-name">${p.name}</div>
+        <div class="saved-card-meta">${p.breed} · ${p.area}</div>
+      </div>
+      <button class="remove-btn" onclick="event.stopPropagation(); removeLike('${p.id}')" title="移除">✕</button>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════════
+// 用戶選單
+// ══════════════════════════════════════════════
+function toggleUserMenu(forceClose) {
+  const menu = document.getElementById('user-menu-popup');
+  if (forceClose) { menu.classList.add('hidden'); return; }
+  menu.classList.toggle('hidden');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#avatar-btn') && !e.target.closest('#user-menu-popup')) {
+    document.getElementById('user-menu-popup').classList.add('hidden');
+  }
+});
+
+// ══════════════════════════════════════════════
+// UI 輔助
+// ══════════════════════════════════════════════
+function showScreen(id) {
+  ['loading-screen','config-screen','auth-screen','app-screen','saved-screen']
+    .forEach(s => document.getElementById(s).classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function setApiStatus(type, msg) {
+  const el = document.getElementById('api-status');
+  el.className = `api-status ${type}`;
+  el.innerHTML = type === 'loading'
+    ? `<div class="spinner" style="width:16px;height:16px;border-width:2px"></div><span>${msg}</span>`
+    : `<i class="ti ti-${type==='success'?'check':'alert-circle'}"></i><span>${msg}</span>`;
+  if (type !== 'loading') setTimeout(() => el.classList.add('hidden'), 4000);
+}
+
+function enableButtons(on) {
+  ['btn-nope','btn-info','btn-like'].forEach(id => {
+    document.getElementById(id).disabled = !on;
+  });
+}
+
+// ══════════════════════════════════════════════
+// 示範資料（當 API 不可用時）
+// ══════════════════════════════════════════════
+function getDemoPets() {
+  return [
+    { id:'d1', name:'豆豆', kind:'犬', emoji:'🐶', bg:'#FFF0E0', breed:'米克斯犬', sex:'男生', colour:'黃色', area:'台北市', shelter:'台北市動物之家', shelterAddr:'台北市內湖區', shelterTel:'02-27963967', tags:[{t:'已結紮',c:'green'},{t:'已打疫苗',c:'green'},{t:'中型',c:''}], photo:null, foundplace:'內湖區', remark:'個性溫和親人，喜歡散步。', opendate:'2025-03-01', url:'https://animal.moa.gov.tw/' },
+    { id:'d2', name:'奶茶', kind:'貓', emoji:'🐱', bg:'#F0F0FF', breed:'橘白貓', sex:'女生', colour:'橘白', area:'新北市', shelter:'新北市動物保護防疫處', shelterAddr:'新北市板橋區', shelterTel:'02-29603456', tags:[{t:'已結紮',c:'green'},{t:'已打疫苗',c:'green'}], photo:null, foundplace:'板橋區', remark:'安靜乖巧，適合公寓飼養。', opendate:'2025-02-15', url:'https://animal.moa.gov.tw/' },
+    { id:'d3', name:'胡椒', kind:'犬', emoji:'🐶', bg:'#FFF5E0', breed:'博美米克斯', sex:'男生', colour:'白色', area:'台中市', shelter:'台中市動物保護防疫處', shelterAddr:'台中市西屯區', shelterTel:'04-23561234', tags:[{t:'已結紮',c:'green'},{t:'小型',c:''}], photo:null, foundplace:'西屯區', remark:'聰明活潑，學習力強。', opendate:'2025-04-10', url:'https://animal.moa.gov.tw/' },
+    { id:'d4', name:'芒果', kind:'貓', emoji:'🐱', bg:'#FFF8E0', breed:'虎斑貓', sex:'女生', colour:'棕色條紋', area:'高雄市', shelter:'高雄市動物保護處', shelterAddr:'高雄市苓雅區', shelterTel:'07-7225105', tags:[{t:'已結紮',c:'green'},{t:'已打疫苗',c:'green'},{t:'大型',c:''}], photo:null, foundplace:'苓雅區', remark:'成貓，個性穩重，喜歡曬太陽。', opendate:'2025-01-20', url:'https://animal.moa.gov.tw/' },
+  ];
+}
+</script>
+</body>
+</html>
