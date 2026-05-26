@@ -398,35 +398,38 @@ let likedSet = new Set(), likedData = {};
 
 // ══════════ 初始化 ══════════
 window.addEventListener('DOMContentLoaded', async () => {
-  // 處理 Google OAuth 回調
-  const hash = window.location.hash;
-  if (hash.includes('access_token') || hash.includes('error')) {
-    const { data: { session } } = await sbClient.auth.getSession();
-    if (session) {
+  // onAuthStateChange 是最可靠的方式，涵蓋所有情境：
+  // 1. 一般重新整理（已登入）
+  // 2. Google OAuth 回調（帶 token 的 hash）
+  // 3. 未登入
+  sbClient.auth.onAuthStateChange(async (event, session) => {
+    hide('loading-screen');
+    if (session && !currentUser) {
+      // 清除網址上的 token hash，避免重新整理時重複處理
+      if (window.location.hash.includes('access_token')) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
       currentUser = session.user;
-      window.history.replaceState({}, '', window.location.pathname);
+      hide('auth-screen');
       await initApp();
-      hide('loading-screen');
-      return;
+    } else if (!session && event === 'SIGNED_OUT') {
+      currentUser = null;
+      hide('app-screen');
+      show('auth-screen');
     }
-  }
+  });
 
+  // 觸發初始狀態檢查
   const { data: { session } } = await sbClient.auth.getSession();
   hide('loading-screen');
   if (session) {
     currentUser = session.user;
     await initApp();
-  } else {
+  } else if (!window.location.hash.includes('access_token')) {
+    // 沒有 session 也沒有回調 token，直接顯示登入頁
     show('auth-screen');
   }
-
-  sbClient.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session && !currentUser) {
-      currentUser = session.user;
-      hide('auth-screen');
-      await initApp();
-    }
-  });
+  // 若有 access_token hash，等 onAuthStateChange 處理即可
 });
 
 // ══════════ 登入 ══════════
@@ -507,7 +510,14 @@ function normalizePet(a) {
   const bg = kind==='犬'?'#FFF0E0':kind==='貓'?'#F0F0FF':'#F0FFF0';
   const sexMap = {M:'男生',F:'女生',N:'未知'};
   let photo = null;
-  if (a.album_file) { const f=a.album_file.split(';').filter(Boolean); if(f.length) photo=f[0]; }
+  if (a.album_file) {
+    const f = a.album_file.split(';').filter(Boolean);
+    if (f.length) {
+      let u = f[0].trim();
+      if (u.startsWith('http://')) u = u.replace('http://', 'https://');
+      photo = u || null;
+    }
+  }
   const area = AREA_MAP[a.animal_area_pkid] || (a.shelter_name||'').slice(0,3) || '未知';
   const tags = [];
   if (a.animal_sterilization==='Y') tags.push({t:'已結紮',c:'green'});
@@ -521,7 +531,7 @@ function normalizePet(a) {
     shelterTel:a.shelter_tel||'', tags, photo,
     foundplace:a.animal_foundplace||'', remark:a.animal_remark||a.animal_caption||'',
     opendate:a.animal_opendate?a.animal_opendate.slice(0,10):'',
-    url:`https://animal.moa.gov.tw/Frontend/AnnounceMent/AnnounceMentInfo?id=${a.animal_id}`
+    url:`https://animal.moa.gov.tw/Frontend/AdoptSearch/AnnounceMentInfo?id=${a.animal_id}`
   };
 }
 
