@@ -401,7 +401,7 @@ const WORKER   = 'https://maoyuan-api.ms0439883.workers.dev/';
 
 const sbClient = window.supabase.createClient(SB_URL, SB_KEY);
 
-let currentUser = null, guestOn = false;
+let currentUser = null, guestOn = false, appInited = false;
 let allPets = [], filteredPets = [];
 let currentIndex = 0;
 let kindFilter = 'all', cityFilter = 'all', shelterFilter = 'all';
@@ -435,7 +435,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       await initApp();
     }
     if (event === 'SIGNED_OUT') {
-      currentUser = null; guestOn = false; petsLoaded = false;
+      currentUser = null; guestOn = false; petsLoaded = false; appInited = false;
       allPets = []; filteredPets = [];
       likedSet.clear(); likedData = {};
       hide('app-screen');
@@ -471,7 +471,7 @@ async function doLogout() {
   try { await sbClient.auth.signOut(); } catch(e) { console.warn(e); }
   // SIGNED_OUT event 會接手，但若是 guest 模式直接手動切換
   if (guestOn) {
-    currentUser = null; guestOn = false; petsLoaded = false;
+    currentUser = null; guestOn = false; petsLoaded = false; appInited = false;
     allPets = []; filteredPets = [];
     likedSet.clear(); likedData = {};
     hide('app-screen');
@@ -481,6 +481,8 @@ async function doLogout() {
 
 // ── App 初始化 ──
 async function initApp() {
+  if (appInited) return;
+  appInited = true;
   show('app-screen');
   show('filter-screen');
   hide('swipe-screen');
@@ -492,8 +494,11 @@ async function initApp() {
     const pic = currentUser.user_metadata?.avatar_url;
     const av = document.getElementById('avatar-btn');
     if (pic) {
-      av.innerHTML = `<img src="${pic}" style="width:34px;height:34px;border-radius:50%;object-fit:cover">
-        <div class="liked-badge hidden" id="liked-badge">0</div>`;
+      // 只換頭像字母為圖片，不替換整個 innerHTML 避免覆蓋 liked-badge
+      const letterEl = document.getElementById('avatar-letter');
+      if (letterEl) {
+        letterEl.innerHTML = `<img src="${pic}" style="width:28px;height:28px;border-radius:50%;object-fit:cover">`;
+      }
     } else {
       document.getElementById('avatar-letter').textContent = (email[0] || '?').toUpperCase();
     }
