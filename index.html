@@ -512,12 +512,17 @@ async function loadPetsForFilter() {
   document.getElementById('filter-loading-note').classList.remove('hidden');
   document.getElementById('start-btn').disabled = true;
   try {
+    console.log('開始 fetch:', WORKER);
     const res = await fetch(WORKER);
+    console.log('HTTP 狀態:', res.status);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const raw = await res.json();
+    console.log('資料筆數:', raw.length, '第一筆:', raw[0]);
     allPets = raw.filter(a => a.animal_status === 'OPEN').map(normalizePet);
+    console.log('篩選後 allPets:', allPets.length, '第一筆:', allPets[0]);
     petsLoaded = true;
     buildCityOptions();
+    console.log('縣市選單建立完成');
     document.getElementById('filter-loading-note').classList.add('hidden');
     document.getElementById('start-btn').disabled = false;
   } catch(e) {
@@ -555,6 +560,7 @@ const CITY_MAP = {
 
 function buildCityOptions() {
   const cities = [...new Set(allPets.map(p => p.city).filter(Boolean))].sort();
+  console.log('可用縣市:', cities);
   const sel = document.getElementById('city-sel');
   sel.innerHTML = '<option value="all">全台灣</option>';
   cities.forEach(c => {
@@ -562,6 +568,7 @@ function buildCityOptions() {
     o.value = c; o.textContent = c;
     sel.appendChild(o);
   });
+  console.log('選單 options 數量:', sel.options.length);
 }
 
 function onCityChange(val) {
