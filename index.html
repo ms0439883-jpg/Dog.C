@@ -521,10 +521,26 @@ async function loadPetsForFilter() {
     document.getElementById('filter-loading-note').classList.add('hidden');
     document.getElementById('start-btn').disabled = false;
   } catch(e) {
-    console.error(e);
-    document.getElementById('filter-loading-note').innerHTML =
-      '<span style="color:var(--red)">⚠ 資料載入失敗，請重新整理頁面</span>';
-    document.getElementById('start-btn').disabled = false;
+    console.error('Worker fetch error:', e);
+    // Try direct fetch as fallback
+    try {
+      const res2 = await fetch('https://maoyuan-api.ms0439883.workers.dev/', {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!res2.ok) throw new Error('HTTP ' + res2.status);
+      const raw2 = await res2.json();
+      allPets = raw2.filter(a => a.animal_status === 'OPEN').map(normalizePet);
+      petsLoaded = true;
+      buildCityOptions();
+      document.getElementById('filter-loading-note').classList.add('hidden');
+      document.getElementById('start-btn').disabled = false;
+    } catch(e2) {
+      console.error('Fallback error:', e2);
+      document.getElementById('filter-loading-note').innerHTML =
+        '<span style="color:var(--red)">⚠ 資料載入失敗：' + e2.message + '</span>';
+      document.getElementById('start-btn').disabled = false;
+    }
   }
 }
 
@@ -637,9 +653,10 @@ function normalizePet(a) {
   const sexMap  = { M:'公', F:'母' };
   const tags = [];
   if (sexMap[a.animal_sex])   tags.push({ t: sexMap[a.animal_sex], c: a.animal_sex === 'M' ? 'blue' : 'red' });
-  if (a.animal_sterilization === 'Y') tags.push({ t:'已結紮', c:'green' });
-  else tags.push({ t:'未結紮', c:'' });
-  if (a.animal_bacterin === 'Y') tags.push({ t:'已打疫苗', c:'green' });
+  const steril = a.animal_sterilization;
+  if (steril === 'Y' || steril === 'T') tags.push({ t:'已結紮', c:'green' });
+  else if (steril === 'N' || steril === 'F') tags.push({ t:'未結紮', c:'' });
+  if (a.animal_bacterin === 'Y' || a.animal_bacterin === 'T') tags.push({ t:'已打疫苗', c:'green' });
   if (a.animal_bodytype) tags.push({ t: a.animal_bodytype, c:'' });
   return {
     id: String(a.animal_id),
