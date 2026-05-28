@@ -413,7 +413,11 @@ function toB64(str) {
   try { return btoa(unescape(encodeURIComponent(String(str)))); } catch(e) { return btoa(String(str)); }
 }
 function petGovUrl(subid, pkid) {
-  return `https://www.pet.gov.tw/AnimalApp/AnnounceSingle.aspx?PageType=Adopt&AcNum=${toB64(subid)}&UT=${encodeURIComponent(toB64(pkid))}`;
+  // pet.gov.tw 使用 animal_subid 的 base64 作為 AcNum
+  // UT 是收容所 pkid 的 base64
+  const acnum = toB64(String(subid));
+  const ut = toB64(String(pkid));
+  return `https://www.pet.gov.tw/AnimalApp/AnnounceSingle.aspx?PageType=Adopt&AcNum=${acnum}&UT=${ut}`;
 }
 
 function calcDays(d) {
@@ -525,6 +529,13 @@ async function loadPetsForFilter() {
     console.log('資料筆數:', raw.length, '第一筆:', raw[0]);
     allPets = raw.filter(a => a.animal_status === 'OPEN').map(normalizePet);
     console.log('篩選後 allPets:', allPets.length, '第一筆:', allPets[0]);
+    // 統計各 kind 數量
+    const kindCount = {};
+    allPets.forEach(p => { kindCount[p.kind] = (kindCount[p.kind]||0)+1; });
+    console.log('物種分佈:', kindCount);
+    // 顯示原始 animal_kind 的前10種值
+    const rawKinds = [...new Set(allPets.slice(0,200).map(p => p.species))].slice(0,10);
+    console.log('原始 animal_kind 值範例:', rawKinds);
     petsLoaded = true;
     buildCityOptions();
     console.log('縣市選單建立完成');
@@ -665,7 +676,7 @@ function goBackFilter() {
 // ── normalizePet ──
 function normalizePet(a) {
   const kindRaw = (a.animal_kind || '').trim();
-  const kind  = kindRaw.includes('犬') ? '犬' : kindRaw.includes('貓') ? '貓' : '其他';
+  const kind  = (kindRaw.includes('犬') || kindRaw.includes('狗')) ? '犬' : kindRaw.includes('貓') ? '貓' : '其他';
   const emoji = kind === '犬' ? '🐶' : kind === '貓' ? '🐱' : '🐾';
   const bg    = kind === '犬' ? '#FFF0E0' : kind === '貓' ? '#EEF0FF' : '#F0FFF0';
   let photo = null;
