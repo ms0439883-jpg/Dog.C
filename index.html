@@ -555,13 +555,27 @@ async function loadPetsForFilter() {
 }
 
 // ── 縣市/收容所 ──
-const CITY_MAP = {
-  '63':'台北市','65':'新北市','68':'桃園市','10018':'新竹市','10004':'新竹縣',
-  '10005':'苗栗縣','66':'台中市','10007':'彰化縣','10008':'南投縣','10009':'雲林縣',
-  '10010':'嘉義縣','10020':'嘉義市','67':'台南市','64':'高雄市','10013':'屏東縣',
-  '10017':'宜蘭縣','10015':'花蓮縣','10014':'台東縣','10016':'澎湖縣',
-  '09007':'金門縣','09020':'連江縣'
-};
+// 直接從 shelter_name 前3字抓縣市，不依賴 pkid
+const CITY_LIST = [
+  '臺北市','新北市','桃園市','臺中市','臺南市','高雄市',
+  '基隆市','新竹市','嘉義市','新竹縣','苗栗縣','彰化縣',
+  '南投縣','雲林縣','嘉義縣','屏東縣','宜蘭縣','花蓮縣',
+  '臺東縣','澎湖縣','金門縣','連江縣'
+];
+function extractCity(shelterName) {
+  if (!shelterName) return '';
+  const name = shelterName.trim();
+  for (const c of CITY_LIST) {
+    if (name.startsWith(c)) return c;
+  }
+  // 台/臺 互換再試
+  const alt = name.replace('台','臺').replace('臺','台');
+  for (const c of CITY_LIST) {
+    const ca = c.replace('台','臺').replace('臺','台');
+    if (alt.startsWith(ca)) return c;
+  }
+  return name.slice(0, 3) || '';
+}
 
 function buildCityOptions() {
   const cities = [...new Set(allPets.map(p => p.city).filter(Boolean))].sort();
@@ -659,7 +673,7 @@ function normalizePet(a) {
     const p = a.album_file.split(';').map(s => s.trim()).filter(Boolean);
     if (p.length) photo = p[0].replace(/^http:\/\//i, 'https://');
   }
-  const city    = CITY_MAP[String(a.animal_area_pkid)] || '';
+  const city    = extractCity(a.shelter_name);
   const shelter = (a.shelter_name || '').trim();
   const days    = calcDays(a.animal_opendate);
   const sexMap  = { M:'公', F:'母' };
