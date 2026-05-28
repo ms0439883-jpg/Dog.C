@@ -659,7 +659,7 @@ function normalizePet(a) {
     const p = a.album_file.split(';').map(s => s.trim()).filter(Boolean);
     if (p.length) photo = p[0].replace(/^http:\/\//i, 'https://');
   }
-  const city    = CITY_MAP[a.animal_area_pkid] || '';
+  const city    = CITY_MAP[String(a.animal_area_pkid)] || '';
   const shelter = (a.shelter_name || '').trim();
   const days    = calcDays(a.animal_opendate);
   const sexMap  = { M:'公', F:'母' };
@@ -679,7 +679,7 @@ function normalizePet(a) {
     colour: a.animal_colour || '',
     city, shelter, shelterTel: a.shelter_tel || '',
     tags, photo, days,
-    petUrl: petGovUrl(a.animal_subid, a.animal_shelter_pkid)
+    petUrl: petGovUrl(a.animal_subid, String(a.animal_shelter_pkid))
   };
 }
 
