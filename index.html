@@ -413,10 +413,10 @@ function toB64(str) {
   try { return btoa(unescape(encodeURIComponent(String(str)))); } catch(e) { return btoa(String(str)); }
 }
 function petGovUrl(subid, pkid) {
-  // pet.gov.tw 使用 animal_subid 的 base64 作為 AcNum
-  // UT 是收容所 pkid 的 base64
+  // AcNum = base64(animal_subid)
+  // UT = base64(animal_subid 的前5字元)
   const acnum = toB64(String(subid));
-  const ut = toB64(String(pkid));
+  const ut = toB64(String(subid).slice(0, 5));
   return `https://www.pet.gov.tw/AnimalApp/AnnounceSingle.aspx?PageType=Adopt&AcNum=${acnum}&UT=${ut}`;
 }
 
