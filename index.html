@@ -184,11 +184,23 @@ select { font-family: inherit; outline: none; }
   border-radius: 10px; padding: 4px 10px; font-size: 12px; font-weight: 600; backdrop-filter: blur(4px);
 }
 .days-badge.warn { background: rgba(204,48,48,0.82); }
-.card-body { padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 10px; height: 44%; }
+.card-body { padding: 12px 16px 10px; display: flex; flex-direction: column; gap: 7px; height: 44%; }
 .card-row1 { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .pet-species { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; color: var(--brown); line-height: 1.1; }
 .pet-breed { font-size: 12px; color: var(--brown-light); margin-top: 3px; }
 .shelter-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px; background: var(--blue-bg); color: var(--blue); white-space: nowrap; flex-shrink: 0; max-width: 130px; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.shelter-overlay {
+  position: absolute; bottom: 10px; right: 10px;
+  background: rgba(32,96,160,0.82); color: white;
+  border-radius: 10px; padding: 4px 10px; font-size: 11px; font-weight: 600;
+  backdrop-filter: blur(4px); max-width: 180px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card-remark {
+  font-size: 11px; color: var(--brown-light); line-height: 1.5;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 .card-tags { display: flex; gap: 5px; flex-wrap: wrap; }
 .tag { font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 10px; background: var(--warm-bg); color: var(--brown-mid); }
 .tag.green { background: var(--green-bg); color: var(--green); }
@@ -686,6 +698,7 @@ function normalizePet(a) {
   }
   const city    = extractCity(a.shelter_name);
   const shelter = (a.shelter_name || '').trim();
+  const shelterShort = shelter.replace('公立動物之家','動物之家').replace('動物保護防疫處','動保處').replace('動物保護教育園區','動保園區');
   const days    = calcDays(a.animal_opendate);
   const sexMap  = { M:'公', F:'母' };
   const tags = [];
@@ -702,8 +715,11 @@ function normalizePet(a) {
     species: kindRaw || '未知',
     breed: (a.animal_Variety || kindRaw || '未知品種').trim(),
     colour: a.animal_colour || '',
-    city, shelter, shelterTel: a.shelter_tel || '',
+    city, shelter, shelterShort: shelter.replace('公立動物之家','動物之家').replace('動物保護防疫處','動保處').replace('動物保護教育園區','動保園區'), shelterTel: a.shelter_tel || '',
     tags, photo, days,
+    foundplace: a.animal_foundplace || '',
+    remark: (a.animal_remark || a.animal_caption || '').trim(),
+    reason: a.animal_place || '',
     petUrl: petGovUrl(a.animal_subid, String(a.animal_shelter_pkid))
   };
 }
@@ -737,11 +753,13 @@ function buildCard(pet, layer) {
   const daysBadge = pet.days !== null
     ? `<div class="days-badge${pet.days > 90 ? ' warn' : ''}">入所 ${pet.days} 天</div>` : '';
   const tagsHtml = pet.tags.map(t => `<span class="tag ${t.c}">${t.t}</span>`).join('');
+  const remarkHtml = pet.remark ? `<div class="card-remark">${pet.remark.slice(0,55)}${pet.remark.length>55?'…':''}</div>` : '';
   card.innerHTML = `
     <div class="card-photo-wrap">
       ${photoHtml}
       <div class="card-photo-ph" style="background:${pet.bg};${phStyle}">${pet.emoji}</div>
       ${daysBadge}
+      <div class="shelter-overlay" title="${pet.shelter}">${pet.shelterShort}</div>
     </div>
     <div class="card-body">
       <div class="card-row1">
@@ -749,9 +767,9 @@ function buildCard(pet, layer) {
           <div class="pet-species">${pet.species}</div>
           <div class="pet-breed">${pet.breed}${pet.colour ? '・' + pet.colour : ''}</div>
         </div>
-        <div class="shelter-badge" title="${pet.shelter}">${pet.shelter}</div>
       </div>
       <div class="card-tags">${tagsHtml}</div>
+      ${remarkHtml}
       <div class="card-footer">
         <div class="shelter-loc">
           <i class="ti ti-map-pin" style="font-size:11px;flex-shrink:0"></i>
@@ -771,33 +789,58 @@ function buildCard(pet, layer) {
 let dragging = false, sx = 0, sy = 0, cx = 0;
 function attachDrag(card) {
   if (!card) return;
+  let startTime = 0;
   card.addEventListener('mousedown', s);
   card.addEventListener('touchstart', s, { passive: true });
+
   function s(e) {
     if (e.target.closest('a')) return;
-    dragging = true; cx = 0; card.style.transition = 'none';
-    const p = e.touches ? e.touches[0] : e; sx = p.clientX; sy = p.clientY;
+    dragging = true; cx = 0; startTime = Date.now();
+    card.style.transition = 'none';
+    card.style.willChange = 'transform';
+    const p = e.touches ? e.touches[0] : e;
+    sx = p.clientX; sy = p.clientY;
     document.addEventListener('mousemove', m);
-    document.addEventListener('touchmove', m, { passive: true });
+    document.addEventListener('touchmove', m, { passive: false });
     document.addEventListener('mouseup', en);
     document.addEventListener('touchend', en);
   }
+
   function m(e) {
     if (!dragging) return;
+    // 阻止觸控時頁面滾動
+    if (e.cancelable) e.preventDefault();
     const p = e.touches ? e.touches[0] : e;
     cx = p.clientX - sx;
-    card.style.transform = `translateX(${cx}px) translateY(${(p.clientY - sy) * 0.3}px) rotate(${cx * 0.06}deg)`;
-    card.querySelector('.label-like').style.opacity = cx > 60 ? Math.min(1, (cx - 60) / 60) : 0;
-    card.querySelector('.label-nope').style.opacity = cx < -60 ? Math.min(1, (-cx - 60) / 60) : 0;
+    const cy = (p.clientY - sy) * 0.15;
+    const rot = cx * 0.05;
+    // 用 requestAnimationFrame 讓動畫更順
+    requestAnimationFrame(() => {
+      card.style.transform = `translateX(${cx}px) translateY(${cy}px) rotate(${rot}deg)`;
+    });
+    const th = 50;
+    card.querySelector('.label-like').style.opacity = cx > th ? Math.min(1, (cx - th) / 80) : 0;
+    card.querySelector('.label-nope').style.opacity = cx < -th ? Math.min(1, (-cx - th) / 80) : 0;
   }
-  function en() {
-    if (!dragging) return; dragging = false;
-    document.removeEventListener('mousemove', m); document.removeEventListener('touchmove', m);
-    document.removeEventListener('mouseup', en); document.removeEventListener('touchend', en);
-    if (cx > 100) doSwipe('like');
-    else if (cx < -100) doSwipe('nope');
+
+  function en(e) {
+    if (!dragging) return;
+    dragging = false;
+    card.style.willChange = 'auto';
+    document.removeEventListener('mousemove', m);
+    document.removeEventListener('touchmove', m);
+    document.removeEventListener('mouseup', en);
+    document.removeEventListener('touchend', en);
+
+    // 快速滑動（速度判斷）
+    const elapsed = Date.now() - startTime;
+    const velocity = Math.abs(cx) / elapsed;
+    const shouldSwipe = Math.abs(cx) > 80 || (velocity > 0.4 && Math.abs(cx) > 30);
+
+    if (shouldSwipe && cx > 0) doSwipe('like');
+    else if (shouldSwipe && cx < 0) doSwipe('nope');
     else {
-      card.style.transition = 'transform 0.3s cubic-bezier(.25,.8,.25,1)';
+      card.style.transition = 'transform 0.35s cubic-bezier(.25,.8,.25,1)';
       card.style.transform = '';
       card.querySelector('.label-like').style.opacity = 0;
       card.querySelector('.label-nope').style.opacity = 0;
