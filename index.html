@@ -253,6 +253,14 @@ select { font-family: inherit; outline: none; }
   pointer-events: none;
 }
 
+/* 動物動畫畫布 */
+#animals-canvas {
+  position: fixed; inset: 0; z-index: 490;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
 /* 收藏列 */
 .liked-shelf { width: 100%; max-width: 400px; background: white; border-radius: 16px; border: 1px solid var(--border); padding: 14px 16px; }
 .shelf-title { font-size: 11px; font-weight: 600; color: var(--brown-light); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
@@ -303,6 +311,7 @@ select { font-family: inherit; outline: none; }
 
 <div id="global-gray"></div>
 <canvas id="confetti-canvas"></canvas>
+<canvas id="animals-canvas"></canvas>
 <div id="loading-screen">
   <div class="logo-big">毛緣<span>配對</span></div>
   <div class="spinner"></div>
@@ -920,6 +929,9 @@ function attachDrag(card) {
     const th = 50;
     card.querySelector('.label-like').style.opacity = cx > th ? Math.min(1, (cx - th) / 80) : 0;
     card.querySelector('.label-nope').style.opacity = cx < -th ? Math.min(1, (-cx - th) / 80) : 0;
+    // 動物動畫
+    drawRunningAnimals(cx);
+
     // 全畫面灰化（往左）
     const globalGray = document.getElementById('global-gray');
     if (globalGray) {
@@ -962,6 +974,7 @@ function attachDrag(card) {
       if (overlay) overlay.style.background = 'rgba(40,40,40,0)';
       const globalGray = document.getElementById('global-gray');
       if (globalGray) globalGray.style.background = 'rgba(20,20,20,0)';
+      clearAnimals();
     }
     cx = 0;
   }
@@ -973,9 +986,10 @@ async function doSwipe(dir) {
   const card = document.querySelector('.pet-card.z2');
   if (card) { card.style.transition = 'none'; card.classList.add(dir === 'like' ? 'fly-right' : 'fly-left'); }
 
-  // 重置灰化
+  // 重置灰化 + 動物
   const globalGray = document.getElementById('global-gray');
   if (globalGray) globalGray.style.background = 'rgba(20,20,20,0)';
+  clearAnimals();
 
   if (dir === 'like') {
     playHappy();
@@ -1063,6 +1077,234 @@ document.addEventListener('click', e => {
 function show(id) { document.getElementById(id).classList.remove('hidden'); }
 function hide(id) { document.getElementById(id).classList.add('hidden'); }
 function enableBtns(on) { ['btn-nope','btn-like'].forEach(id => document.getElementById(id).disabled = !on); }
+
+// ── Q版動物動畫 ──
+let animalAnimFrame = null;
+let animalParticles = [];
+let lastCx = 0;
+
+// 畫 Q 版狗（線條風格）
+function drawDog(ctx, x, y, size, facing) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (facing === 'left') ctx.scale(-1, 1);
+  ctx.strokeStyle = '#3D2314';
+  ctx.lineWidth = size * 0.08;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // 身體
+  ctx.beginPath();
+  ctx.ellipse(0, 0, size * 0.38, size * 0.25, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 頭
+  ctx.beginPath();
+  ctx.arc(size * 0.35, -size * 0.18, size * 0.22, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 耳朵
+  ctx.beginPath();
+  ctx.moveTo(size * 0.22, -size * 0.35);
+  ctx.lineTo(size * 0.15, -size * 0.52);
+  ctx.lineTo(size * 0.38, -size * 0.42);
+  ctx.closePath();
+  ctx.stroke();
+
+  // 眼睛
+  ctx.beginPath();
+  ctx.arc(size * 0.42, -size * 0.22, size * 0.04, 0, Math.PI * 2);
+  ctx.fillStyle = '#3D2314';
+  ctx.fill();
+
+  // 鼻子
+  ctx.beginPath();
+  ctx.arc(size * 0.54, -size * 0.15, size * 0.03, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 尾巴
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.35, -size * 0.1);
+  ctx.quadraticCurveTo(-size * 0.55, -size * 0.45, -size * 0.3, -size * 0.38);
+  ctx.stroke();
+
+  // 腿（跑步姿態，根據時間搖擺）
+  const t = Date.now() / 120;
+  const leg1 = Math.sin(t) * 0.3;
+  const leg2 = Math.sin(t + Math.PI) * 0.3;
+
+  // 前腿
+  ctx.beginPath();
+  ctx.moveTo(size * 0.18, size * 0.2);
+  ctx.lineTo(size * 0.25 + leg1 * size * 0.2, size * 0.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(size * 0.28, size * 0.2);
+  ctx.lineTo(size * 0.35 + leg2 * size * 0.2, size * 0.5);
+  ctx.stroke();
+
+  // 後腿
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.18, size * 0.2);
+  ctx.lineTo(-size * 0.1 + leg2 * size * 0.2, size * 0.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.28, size * 0.2);
+  ctx.lineTo(-size * 0.2 + leg1 * size * 0.2, size * 0.5);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// 畫 Q 版貓（線條風格）
+function drawCat(ctx, x, y, size, facing) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (facing === 'left') ctx.scale(-1, 1);
+  ctx.strokeStyle = '#3D2314';
+  ctx.lineWidth = size * 0.08;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // 身體
+  ctx.beginPath();
+  ctx.ellipse(0, 0, size * 0.32, size * 0.22, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 頭
+  ctx.beginPath();
+  ctx.arc(size * 0.3, -size * 0.2, size * 0.2, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 三角耳朵
+  ctx.beginPath();
+  ctx.moveTo(size * 0.18, -size * 0.36);
+  ctx.lineTo(size * 0.12, -size * 0.54);
+  ctx.lineTo(size * 0.32, -size * 0.4);
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(size * 0.3, -size * 0.36);
+  ctx.lineTo(size * 0.42, -size * 0.52);
+  ctx.lineTo(size * 0.46, -size * 0.36);
+  ctx.closePath();
+  ctx.stroke();
+
+  // 眼睛（細長）
+  ctx.beginPath();
+  ctx.ellipse(size * 0.26, -size * 0.22, size * 0.05, size * 0.03, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#3D2314';
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(size * 0.4, -size * 0.22, size * 0.05, size * 0.03, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 鬍鬚
+  ctx.lineWidth = size * 0.04;
+  [[size*0.44, -size*0.16, size*0.62, -size*0.14],
+   [size*0.44, -size*0.18, size*0.62, -size*0.2],
+   [size*0.44, -size*0.16, size*0.26, -size*0.14],
+   [size*0.44, -size*0.18, size*0.26, -size*0.2]].forEach(([x1,y1,x2,y2]) => {
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  });
+
+  // 尾巴（捲曲）
+  ctx.lineWidth = size * 0.08;
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.3, size * 0.05);
+  ctx.bezierCurveTo(-size * 0.6, size * 0.0, -size * 0.65, -size * 0.5, -size * 0.35, -size * 0.45);
+  ctx.stroke();
+
+  // 腿
+  const t = Date.now() / 120;
+  const leg1 = Math.sin(t) * 0.28;
+  const leg2 = Math.sin(t + Math.PI) * 0.28;
+  ctx.lineWidth = size * 0.08;
+  [
+    [size*0.14, size*0.18, size*0.2 + leg1*size*0.18, size*0.44],
+    [size*0.22, size*0.18, size*0.28 + leg2*size*0.18, size*0.44],
+    [-size*0.14, size*0.18, -size*0.08 + leg2*size*0.18, size*0.44],
+    [-size*0.22, size*0.18, -size*0.16 + leg1*size*0.18, size*0.44],
+  ].forEach(([x1,y1,x2,y2]) => {
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+function initAnimalParticles(dir) {
+  const W = window.innerWidth, H = window.innerHeight;
+  animalParticles = [];
+  const count = 6;
+  const drawFns = [drawDog, drawDog, drawCat, drawCat, drawDog, drawCat];
+
+  for (let i = 0; i < count; i++) {
+    const isRight = dir > 0;
+    // 右滑：從螢幕邊緣往中間跑（由小變大）
+    // 左滑：從中間往螢幕邊緣跑（由大變小）
+    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.4;
+    const edgeX = W/2 + Math.cos(angle) * (W * 0.65);
+    const edgeY = H/2 + Math.sin(angle) * (H * 0.55);
+
+    animalParticles.push({
+      x: isRight ? edgeX : W/2 + (Math.random()-0.5)*W*0.3,
+      y: isRight ? edgeY : H/2 + (Math.random()-0.5)*H*0.3,
+      targetX: isRight ? W/2 + (Math.random()-0.5)*W*0.3 : edgeX,
+      targetY: isRight ? H/2 + (Math.random()-0.5)*H*0.3 : edgeY,
+      size: isRight ? 18 : 38,
+      targetSize: isRight ? 38 : 18,
+      facing: isRight ? 'right' : 'left',
+      drawFn: drawFns[i],
+      alpha: 0,
+    });
+  }
+}
+
+function drawRunningAnimals(cx) {
+  const canvas = document.getElementById('animals-canvas');
+  if (!canvas) return;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const progress = Math.min(1, Math.abs(cx) / 120);
+  if (progress < 0.05) { clearAnimals(); return; }
+
+  const dir = cx > 0 ? 1 : -1;
+
+  // 初始化或方向改變時重建粒子
+  if (!animalParticles.length || (lastCx !== 0 && Math.sign(cx) !== Math.sign(lastCx))) {
+    initAnimalParticles(cx);
+  }
+  lastCx = cx;
+
+  canvas.style.opacity = Math.min(1, progress * 2);
+
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  animalParticles.forEach(p => {
+    const curX = p.x + (p.targetX - p.x) * progress;
+    const curY = p.y + (p.targetY - p.y) * progress;
+    const curSize = p.size + (p.targetSize - p.size) * progress;
+    ctx.globalAlpha = progress;
+    p.drawFn(ctx, curX, curY, curSize, p.facing);
+  });
+}
+
+function clearAnimals() {
+  const canvas = document.getElementById('animals-canvas');
+  if (canvas) {
+    canvas.style.opacity = '0';
+    setTimeout(() => {
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }, 150);
+  }
+  animalParticles = [];
+  lastCx = 0;
+}
 
 // ── 天女散花 ──
 function launchConfetti() {
