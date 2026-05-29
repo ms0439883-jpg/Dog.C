@@ -233,6 +233,14 @@ select { font-family: inherit; outline: none; }
 @keyframes flyRight { to { transform: translateX(130%) rotate(22deg); opacity: 0; } }
 @keyframes flyLeft  { to { transform: translateX(-130%) rotate(-22deg); opacity: 0; } }
 
+/* 灰化遮罩 */
+.card-gray-overlay {
+  position: absolute; inset: 0; border-radius: var(--radius);
+  background: rgba(80,80,80,0); pointer-events: none; z-index: 4;
+  transition: background 0.05s;
+  mix-blend-mode: color;
+}
+
 /* 收藏列 */
 .liked-shelf { width: 100%; max-width: 400px; background: white; border-radius: 16px; border: 1px solid var(--border); padding: 14px 16px; }
 .shelf-title { font-size: 11px; font-weight: 600; color: var(--brown-light); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
@@ -407,6 +415,22 @@ select { font-family: inherit; outline: none; }
 </div>
 
 <script>
+// ── 音效 ──
+const BASE_URL = 'https://ms0439883-jpg.github.io/Dog.C';
+const audioHappy = new Audio(`${BASE_URL}/happy.wav`);
+const audioSad   = new Audio(`${BASE_URL}/sad.wav`);
+audioHappy.preload = 'auto';
+audioSad.preload   = 'auto';
+
+function playHappy() {
+  audioHappy.currentTime = 0;
+  audioHappy.play().catch(() => {});
+}
+function playSad() {
+  audioSad.currentTime = 0;
+  audioSad.play().catch(() => {});
+}
+
 const SB_URL   = 'https://saopglhkmofwlptxjggx.supabase.co';
 const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhb3BnbGhrbW9md2xwdHhqZ2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNDU5MTIsImV4cCI6MjA5NDkyMTkxMn0.IkImvcaNneK2rBT-EymfC4YsDNpMkCE3zNaGLdwwmF0';
 const WORKER   = 'https://maoyuan-api.ms0439883.workers.dev/';
@@ -781,7 +805,8 @@ function buildCard(pet, layer) {
       </div>
     </div>
     <div class="swipe-label label-like">❤️ 有緣</div>
-    <div class="swipe-label label-nope">✕ 跳過</div>`;
+    <div class="swipe-label label-nope">✕ 跳過</div>
+    <div class="card-gray-overlay" id="gray-overlay"></div>`;
   return card;
 }
 
@@ -821,6 +846,17 @@ function attachDrag(card) {
     const th = 50;
     card.querySelector('.label-like').style.opacity = cx > th ? Math.min(1, (cx - th) / 80) : 0;
     card.querySelector('.label-nope').style.opacity = cx < -th ? Math.min(1, (-cx - th) / 80) : 0;
+    // 往左灰化效果
+    const overlay = card.querySelector('#gray-overlay');
+    if (overlay) {
+      if (cx < 0) {
+        const grayAmt = Math.min(0.72, (-cx) / 200);
+        overlay.style.background = `rgba(60,60,60,${grayAmt})`;
+        overlay.style.mixBlendMode = 'multiply';
+      } else {
+        overlay.style.background = 'rgba(60,60,60,0)';
+      }
+    }
   }
 
   function en(e) {
@@ -844,6 +880,8 @@ function attachDrag(card) {
       card.style.transform = '';
       card.querySelector('.label-like').style.opacity = 0;
       card.querySelector('.label-nope').style.opacity = 0;
+      const overlay = card.querySelector('#gray-overlay');
+      if (overlay) overlay.style.background = 'rgba(60,60,60,0)';
     }
     cx = 0;
   }
@@ -854,7 +892,13 @@ async function doSwipe(dir) {
   const pet = filteredPets[currentIndex]; if (!pet) return;
   const card = document.querySelector('.pet-card.z2');
   if (card) { card.style.transition = 'none'; card.classList.add(dir === 'like' ? 'fly-right' : 'fly-left'); }
-  if (dir === 'like') { await saveLike(pet); updateShelf(); }
+  // 播放音效
+  if (dir === 'like') {
+    playHappy();
+    await saveLike(pet); updateShelf();
+  } else {
+    playSad();
+  }
   currentIndex++;
   setTimeout(renderStack, 360);
 }
