@@ -341,6 +341,7 @@ select { font-family: inherit; outline: none; }
     <div class="logo">毛緣<span>配對</span></div>
     <div class="user-menu">
       <button class="icon-btn" onclick="showSaved()" title="我的收藏"><i class="ti ti-heart"></i></button>
+      <button class="icon-btn" id="bgm-btn" onclick="toggleBGM()" title="背景音樂"><i class="ti ti-volume"></i></button>
       <div class="user-avatar" id="avatar-btn" onclick="toggleMenu()">
         <span id="avatar-letter">?</span>
         <div class="liked-badge hidden" id="liked-badge">0</div>
@@ -474,13 +475,35 @@ function playSad()   { playBuffer(sadBuffer); }
 function startBGM() {
   if (bgmStarted) return;
   bgmStarted = true;
-  audioBGM.play().catch(() => {});
+  if (!bgmMuted) {
+    audioBGM.play().then(() => {
+      console.log('BGM 開始播放');
+    }).catch(e => {
+      console.warn('BGM 播放失敗:', e);
+    });
+  }
   initAudio();
 }
+
+// bgmMuted 預設 false
+let bgmMuted = false;
 
 // 第一次任何點擊就啟動音效系統
 document.addEventListener('click', startBGM, { once: true });
 document.addEventListener('touchstart', startBGM, { once: true });
+
+function toggleBGM() {
+  bgmMuted = !bgmMuted;
+  if (bgmMuted) {
+    audioBGM.pause();
+  } else {
+    audioBGM.play().catch(() => {});
+  }
+  const btn = document.getElementById('bgm-btn');
+  if (btn) btn.innerHTML = bgmMuted
+    ? '<i class="ti ti-volume-off"></i>'
+    : '<i class="ti ti-volume"></i>';
+}
 
 const SB_URL   = 'https://saopglhkmofwlptxjggx.supabase.co';
 const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhb3BnbGhrbW9md2xwdHhqZ2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNDU5MTIsImV4cCI6MjA5NDkyMTkxMn0.IkImvcaNneK2rBT-EymfC4YsDNpMkCE3zNaGLdwwmF0';
