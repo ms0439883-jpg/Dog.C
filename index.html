@@ -233,12 +233,24 @@ select { font-family: inherit; outline: none; }
 @keyframes flyRight { to { transform: translateX(130%) rotate(22deg); opacity: 0; } }
 @keyframes flyLeft  { to { transform: translateX(-130%) rotate(-22deg); opacity: 0; } }
 
-/* 灰化遮罩 */
+/* 卡片灰化遮罩（保留但不主要用） */
 .card-gray-overlay {
   position: absolute; inset: 0; border-radius: var(--radius);
-  background: rgba(80,80,80,0); pointer-events: none; z-index: 4;
+  background: rgba(60,60,60,0); pointer-events: none; z-index: 4;
+}
+
+/* 全畫面灰化遮罩 */
+#global-gray {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(30,30,30,0);
+  pointer-events: none;
   transition: background 0.05s;
-  mix-blend-mode: color;
+}
+
+/* 天女散花畫布 */
+#confetti-canvas {
+  position: fixed; inset: 0; z-index: 600;
+  pointer-events: none;
 }
 
 /* 收藏列 */
@@ -289,6 +301,8 @@ select { font-family: inherit; outline: none; }
 </head>
 <body>
 
+<div id="global-gray"></div>
+<canvas id="confetti-canvas"></canvas>
 <div id="loading-screen">
   <div class="logo-big">毛緣<span>配對</span></div>
   <div class="spinner"></div>
@@ -417,19 +431,56 @@ select { font-family: inherit; outline: none; }
 <script>
 // ── 音效 ──
 const BASE_URL = 'https://ms0439883-jpg.github.io/Dog.C';
-const audioHappy = new Audio(`${BASE_URL}/happy.wav`);
-const audioSad   = new Audio(`${BASE_URL}/sad.wav`);
-audioHappy.preload = 'auto';
-audioSad.preload   = 'auto';
 
-function playHappy() {
-  audioHappy.currentTime = 0;
-  audioHappy.play().catch(() => {});
+// BGM
+const audioBGM = new Audio(`${BASE_URL}/CuteMusicBGM.mp3`);
+audioBGM.loop = true;
+audioBGM.volume = 0.35;
+audioBGM.preload = 'auto';
+
+// 音效：用 AudioContext + ArrayBuffer 做到零延遲
+let audioCtx = null;
+let happyBuffer = null, sadBuffer = null;
+let bgmStarted = false;
+
+async function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // 預載兩個音效
+  try {
+    const [hRes, sRes] = await Promise.all([
+      fetch(`${BASE_URL}/happy.wav`),
+      fetch(`${BASE_URL}/sad.wav`)
+    ]);
+    const [hBuf, sBuf] = await Promise.all([hRes.arrayBuffer(), sRes.arrayBuffer()]);
+    [happyBuffer, sadBuffer] = await Promise.all([
+      audioCtx.decodeAudioData(hBuf),
+      audioCtx.decodeAudioData(sBuf)
+    ]);
+  } catch(e) { console.warn('音效載入失敗', e); }
 }
-function playSad() {
-  audioSad.currentTime = 0;
-  audioSad.play().catch(() => {});
+
+function playBuffer(buffer) {
+  if (!audioCtx || !buffer) return;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(audioCtx.destination);
+  src.start(0);
 }
+
+function playHappy() { playBuffer(happyBuffer); }
+function playSad()   { playBuffer(sadBuffer); }
+
+function startBGM() {
+  if (bgmStarted) return;
+  bgmStarted = true;
+  audioBGM.play().catch(() => {});
+  initAudio();
+}
+
+// 第一次任何點擊就啟動音效系統
+document.addEventListener('click', startBGM, { once: true });
+document.addEventListener('touchstart', startBGM, { once: true });
 
 const SB_URL   = 'https://saopglhkmofwlptxjggx.supabase.co';
 const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhb3BnbGhrbW9md2xwdHhqZ2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNDU5MTIsImV4cCI6MjA5NDkyMTkxMn0.IkImvcaNneK2rBT-EymfC4YsDNpMkCE3zNaGLdwwmF0';
@@ -846,16 +897,20 @@ function attachDrag(card) {
     const th = 50;
     card.querySelector('.label-like').style.opacity = cx > th ? Math.min(1, (cx - th) / 80) : 0;
     card.querySelector('.label-nope').style.opacity = cx < -th ? Math.min(1, (-cx - th) / 80) : 0;
-    // 往左灰化效果
+    // 全畫面灰化（往左）
+    const globalGray = document.getElementById('global-gray');
+    if (globalGray) {
+      if (cx < 0) {
+        const grayAmt = Math.min(0.65, (-cx) / 180);
+        globalGray.style.background = `rgba(20,20,20,${grayAmt})`;
+      } else {
+        globalGray.style.background = 'rgba(20,20,20,0)';
+      }
+    }
+    // 卡片本身也稍微灰化
     const overlay = card.querySelector('#gray-overlay');
     if (overlay) {
-      if (cx < 0) {
-        const grayAmt = Math.min(0.72, (-cx) / 200);
-        overlay.style.background = `rgba(60,60,60,${grayAmt})`;
-        overlay.style.mixBlendMode = 'multiply';
-      } else {
-        overlay.style.background = 'rgba(60,60,60,0)';
-      }
+      overlay.style.background = cx < 0 ? `rgba(40,40,40,${Math.min(0.4,(-cx)/200)})` : 'rgba(40,40,40,0)';
     }
   }
 
@@ -881,7 +936,9 @@ function attachDrag(card) {
       card.querySelector('.label-like').style.opacity = 0;
       card.querySelector('.label-nope').style.opacity = 0;
       const overlay = card.querySelector('#gray-overlay');
-      if (overlay) overlay.style.background = 'rgba(60,60,60,0)';
+      if (overlay) overlay.style.background = 'rgba(40,40,40,0)';
+      const globalGray = document.getElementById('global-gray');
+      if (globalGray) globalGray.style.background = 'rgba(20,20,20,0)';
     }
     cx = 0;
   }
@@ -892,9 +949,14 @@ async function doSwipe(dir) {
   const pet = filteredPets[currentIndex]; if (!pet) return;
   const card = document.querySelector('.pet-card.z2');
   if (card) { card.style.transition = 'none'; card.classList.add(dir === 'like' ? 'fly-right' : 'fly-left'); }
-  // 播放音效
+
+  // 重置灰化
+  const globalGray = document.getElementById('global-gray');
+  if (globalGray) globalGray.style.background = 'rgba(20,20,20,0)';
+
   if (dir === 'like') {
     playHappy();
+    launchConfetti();
     await saveLike(pet); updateShelf();
   } else {
     playSad();
@@ -978,6 +1040,60 @@ document.addEventListener('click', e => {
 function show(id) { document.getElementById(id).classList.remove('hidden'); }
 function hide(id) { document.getElementById(id).classList.add('hidden'); }
 function enableBtns(on) { ['btn-nope','btn-like'].forEach(id => document.getElementById(id).disabled = !on); }
+
+// ── 天女散花 ──
+function launchConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const colors = ['#E07040','#FFD700','#FF6B9D','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8'];
+  const pieces = [];
+  const count = 120;
+
+  for (let i = 0; i < count; i++) {
+    pieces.push({
+      x: Math.random() * canvas.width,
+      y: -10 - Math.random() * 200,
+      w: 8 + Math.random() * 10,
+      h: 4 + Math.random() * 6,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vx: (Math.random() - 0.5) * 4,
+      vy: 2 + Math.random() * 4,
+      angle: Math.random() * 360,
+      va: (Math.random() - 0.5) * 8,
+      alpha: 1,
+    });
+  }
+
+  let frame = 0;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+    pieces.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.08; // 重力
+      p.angle += p.va;
+      if (frame > 60) p.alpha -= 0.018;
+      if (p.alpha <= 0) return;
+      alive = true;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle * Math.PI / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      ctx.restore();
+    });
+    frame++;
+    if (alive && frame < 180) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  draw();
+}
 </script>
 </body>
 </html>
