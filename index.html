@@ -206,6 +206,7 @@ select { font-family: inherit; outline: none; }
 .tag.green { background: var(--green-bg); color: var(--green); }
 .tag.red { background: var(--red-bg); color: var(--red); }
 .tag.blue { background: var(--blue-bg); color: var(--blue); }
+.tag.date { background: #F5EBE0; color: var(--brown-mid); font-size: 11px; }
 .card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
 .shelter-loc { font-size: 11px; color: var(--brown-light); display: flex; align-items: center; gap: 3px; flex: 1; overflow: hidden; }
 .shelter-loc span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -872,7 +873,7 @@ function buildCard(pet, layer) {
       <div class="card-row1">
         <div>
           <div class="pet-species">${pet.species}</div>
-          <div class="pet-breed">${pet.breed}${pet.colour ? '・' + pet.colour : ''}</div>
+          <div class="pet-breed">${pet.species}</div>
         </div>
       </div>
       <div class="card-tags">${tagsHtml}</div>
