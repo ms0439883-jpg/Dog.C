@@ -810,12 +810,12 @@ function normalizePet(a) {
   const days    = calcDays(a.animal_opendate);
   const sexMap  = { M:'公', F:'母' };
   const tags = [];
-  if (sexMap[a.animal_sex])   tags.push({ t: sexMap[a.animal_sex], c: a.animal_sex === 'M' ? 'blue' : 'red' });
-  const steril = a.animal_sterilization;
-  if (steril === 'Y' || steril === 'T') tags.push({ t:'已結紮', c:'green' });
-  else if (steril === 'N' || steril === 'F') tags.push({ t:'未結紮', c:'' });
-  if (a.animal_bacterin === 'Y' || a.animal_bacterin === 'T') tags.push({ t:'已打疫苗', c:'green' });
-  if (a.animal_bodytype) tags.push({ t: a.animal_bodytype, c:'' });
+  if (sexMap[a.animal_sex]) tags.push({ t: sexMap[a.animal_sex], c: a.animal_sex === 'M' ? 'blue' : 'red' });
+  const breed = (a.animal_Variety || '').trim();
+  if (breed) tags.push({ t: breed, c: '' });
+  if (a.animal_colour) tags.push({ t: a.animal_colour, c: '' });
+  const opendate = a.animal_opendate ? a.animal_opendate.slice(0,10) : '';
+  if (opendate) tags.push({ t: '入所日期：' + opendate, c: 'date' });
   return {
     id: String(a.animal_id),
     subid: a.animal_subid || '', pkid: a.animal_shelter_pkid || '',
