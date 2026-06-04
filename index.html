@@ -172,6 +172,8 @@ select { font-family: inherit; outline: none; }
   cursor: grab; user-select: none; transform-origin: center 90%; will-change: transform;
 }
 .pet-card:active { cursor: grabbing; }
+.pet-card * { pointer-events: none; }
+.pet-card .detail-link { pointer-events: auto; }
 .pet-card.z2 { z-index: 3; box-shadow: var(--shadow); }
 .pet-card.z1 { z-index: 2; transform: scale(0.96) translateY(8px); pointer-events: none; }
 .pet-card.z0 { z-index: 1; transform: scale(0.92) translateY(16px); pointer-events: none; }
@@ -899,17 +901,22 @@ let dragging = false, sx = 0, sy = 0, cx = 0;
 function attachDrag(card) {
   if (!card) return;
   let startTime = 0;
+  let rafId = null;
+  let latestCx = 0, latestCy = 0;
+
   card.addEventListener('mousedown', s);
-  card.addEventListener('touchstart', s, { passive: true });
+  card.addEventListener('touchstart', s, { passive: false });
 
   function s(e) {
-    if (e.target.closest('a')) return;
-    dragging = true; cx = 0; startTime = Date.now();
+    // 只允許詳細資訊連結正常點擊，其餘全部攔截
+    if (e.target.tagName === 'A') return;
+    e.preventDefault();
+    dragging = true; cx = 0; latestCx = 0; startTime = Date.now();
     card.style.transition = 'none';
     card.style.willChange = 'transform';
     const p = e.touches ? e.touches[0] : e;
     sx = p.clientX; sy = p.clientY;
-    document.addEventListener('mousemove', m);
+    document.addEventListener('mousemove', m, { passive: false });
     document.addEventListener('touchmove', m, { passive: false });
     document.addEventListener('mouseup', en);
     document.addEventListener('touchend', en);
@@ -917,57 +924,59 @@ function attachDrag(card) {
 
   function m(e) {
     if (!dragging) return;
-    // 阻止觸控時頁面滾動
     if (e.cancelable) e.preventDefault();
     const p = e.touches ? e.touches[0] : e;
     cx = p.clientX - sx;
-    const cy = (p.clientY - sy) * 0.15;
-    const rot = cx * 0.05;
-    // 用 requestAnimationFrame 讓動畫更順
-    requestAnimationFrame(() => {
-      card.style.transform = `translateX(${cx}px) translateY(${cy}px) rotate(${rot}deg)`;
-    });
-    const th = 50;
-    card.querySelector('.label-like').style.opacity = cx > th ? Math.min(1, (cx - th) / 80) : 0;
-    card.querySelector('.label-nope').style.opacity = cx < -th ? Math.min(1, (-cx - th) / 80) : 0;
-    // 動物動畫
-    if (Math.abs(cx) > 20) startAnimalAnim(cx > 0 ? 1 : -1);
+    latestCx = cx;
+    latestCy = (p.clientY - sy) * 0.12;
 
-    // 全畫面灰化（往左）
-    const globalGray = document.getElementById('global-gray');
-    if (globalGray) {
-      if (cx < 0) {
-        const grayAmt = Math.min(0.65, (-cx) / 180);
-        globalGray.style.background = `rgba(20,20,20,${grayAmt})`;
-      } else {
-        globalGray.style.background = 'rgba(20,20,20,0)';
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      card.style.transform = `translateX(${latestCx}px) translateY(${latestCy}px) rotate(${latestCx * 0.04}deg)`;
+
+      // 提示文字
+      const th = 40;
+      card.querySelector('.label-like').style.opacity = latestCx > th ? Math.min(1, (latestCx-th)/60) : 0;
+      card.querySelector('.label-nope').style.opacity = latestCx < -th ? Math.min(1, (-latestCx-th)/60) : 0;
+
+      // 動物動畫
+      if (Math.abs(latestCx) > 15) startAnimalAnim(latestCx > 0 ? 1 : -1);
+
+      // 全畫面灰化
+      const globalGray = document.getElementById('global-gray');
+      if (globalGray) {
+        globalGray.style.background = latestCx < 0
+          ? `rgba(20,20,20,${Math.min(0.65, (-latestCx)/160)})`
+          : 'rgba(20,20,20,0)';
       }
-    }
-    // 卡片本身也稍微灰化
-    const overlay = card.querySelector('#gray-overlay');
-    if (overlay) {
-      overlay.style.background = cx < 0 ? `rgba(40,40,40,${Math.min(0.4,(-cx)/200)})` : 'rgba(40,40,40,0)';
-    }
+      const overlay = card.querySelector('#gray-overlay');
+      if (overlay) {
+        overlay.style.background = latestCx < 0
+          ? `rgba(40,40,40,${Math.min(0.4,(-latestCx)/180)})`
+          : 'rgba(40,40,40,0)';
+      }
+    });
   }
 
   function en(e) {
     if (!dragging) return;
     dragging = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     card.style.willChange = 'auto';
     document.removeEventListener('mousemove', m);
     document.removeEventListener('touchmove', m);
     document.removeEventListener('mouseup', en);
     document.removeEventListener('touchend', en);
 
-    // 快速滑動（速度判斷）
-    const elapsed = Date.now() - startTime;
-    const velocity = Math.abs(cx) / elapsed;
-    const shouldSwipe = Math.abs(cx) > 80 || (velocity > 0.4 && Math.abs(cx) > 30);
+    const elapsed = Math.max(1, Date.now() - startTime);
+    const velocity = Math.abs(cx) / elapsed; // px/ms
+    // 門檻降低：距離 > 60px 或速度夠快
+    const shouldSwipe = Math.abs(cx) > 60 || (velocity > 0.3 && Math.abs(cx) > 20);
 
     if (shouldSwipe && cx > 0) doSwipe('like');
     else if (shouldSwipe && cx < 0) doSwipe('nope');
     else {
-      card.style.transition = 'transform 0.35s cubic-bezier(.25,.8,.25,1)';
+      card.style.transition = 'transform 0.3s cubic-bezier(.25,.8,.25,1)';
       card.style.transform = '';
       card.querySelector('.label-like').style.opacity = 0;
       card.querySelector('.label-nope').style.opacity = 0;
