@@ -315,6 +315,25 @@ select { font-family: inherit; outline: none; }
 <div id="global-gray"></div>
 <canvas id="confetti-canvas"></canvas>
 <canvas id="animals-canvas"></canvas>
+<!-- WebView 提示 -->
+<div id="webview-notice" class="hidden" style="
+  position:fixed; inset:0; background:var(--cream); z-index:2000;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:32px; text-align:center; gap:16px;">
+  <div style="font-size:48px">🌐</div>
+  <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:700; color:var(--brown)">
+    請用瀏覽器開啟
+  </div>
+  <div style="font-size:14px; color:var(--brown-light); line-height:1.7">
+    目前在 LINE / Instagram 等 App 的內建瀏覽器中，<br>
+    無法使用 Google 登入。<br><br>
+    請點右上角選單，選擇<strong>「在瀏覽器中開啟」</strong>後再登入。
+  </div>
+  <div style="font-size:12px; color:var(--brown-light); margin-top:8px;">
+    （Safari、Chrome、Firefox 均可）
+  </div>
+</div>
+
 <div id="loading-screen">
   <div class="logo-big">毛緣<span>配對</span></div>
   <div class="spinner"></div>
@@ -445,64 +464,48 @@ select { font-family: inherit; outline: none; }
 // ── 音效 ──
 const BASE_URL = 'https://ms0439883-jpg.github.io/Dog.C';
 
-// BGM
-const audioBGM = new Audio(`${BASE_URL}/CuteMusicBGM.mp3`);
-audioBGM.loop = true;
-audioBGM.volume = 0.35;
+const audioBGM   = new Audio(`${BASE_URL}/CuteMusicBGM.mp3`);
+audioBGM.loop    = true;
+audioBGM.volume  = 0.35;
 audioBGM.preload = 'auto';
 
-// 音效：用 AudioContext + ArrayBuffer 做到零延遲
-let audioCtx = null;
-let happyBuffer = null, sadBuffer = null;
+const audioHappy = new Audio(`${BASE_URL}/happy.wav`);
+const audioSad   = new Audio(`${BASE_URL}/sad.wav`);
+audioHappy.preload = 'auto';
+audioSad.preload   = 'auto';
+
 let bgmStarted = false;
+let bgmMuted   = false;
 
-async function initAudio() {
-  if (audioCtx) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  // 預載兩個音效
-  try {
-    const [hRes, sRes] = await Promise.all([
-      fetch(`${BASE_URL}/happy.wav`),
-      fetch(`${BASE_URL}/sad.wav`)
-    ]);
-    const [hBuf, sBuf] = await Promise.all([hRes.arrayBuffer(), sRes.arrayBuffer()]);
-    [happyBuffer, sadBuffer] = await Promise.all([
-      audioCtx.decodeAudioData(hBuf),
-      audioCtx.decodeAudioData(sBuf)
-    ]);
-  } catch(e) { console.warn('音效載入失敗', e); }
-}
-
-function playBuffer(buffer) {
-  if (!audioCtx || !buffer) return;
-  const src = audioCtx.createBufferSource();
-  src.buffer = buffer;
-  src.connect(audioCtx.destination);
-  src.start(0);
-}
-
-function playHappy() { playBuffer(happyBuffer); }
-function playSad()   { playBuffer(sadBuffer); }
-
-function startBGM() {
+// 手機音訊解鎖：必須在 touchend（非 touchstart）同步呼叫 play()
+// 先 play() 再立刻 pause()，解鎖後 audioBGM 就可以隨時播放
+function unlockAudio() {
   if (bgmStarted) return;
   bgmStarted = true;
-  if (!bgmMuted) {
-    audioBGM.play().then(() => {
-      console.log('BGM 開始播放');
-    }).catch(e => {
-      console.warn('BGM 播放失敗:', e);
-    });
-  }
-  initAudio();
+
+  // 同步解鎖三個 Audio 元素
+  [audioBGM, audioHappy, audioSad].forEach(a => {
+    a.play().then(() => a.pause()).catch(() => {});
+  });
+
+  // 解鎖後延遲一點再正式播 BGM，確保解鎖完成
+  setTimeout(() => {
+    if (!bgmMuted) audioBGM.play().catch(() => {});
+  }, 100);
 }
 
-// bgmMuted 預設 false
-let bgmMuted = false;
+function playHappy() {
+  audioHappy.currentTime = 0;
+  audioHappy.play().catch(() => {});
+}
+function playSad() {
+  audioSad.currentTime = 0;
+  audioSad.play().catch(() => {});
+}
 
-// 第一次任何點擊就啟動音效系統
-document.addEventListener('click', startBGM, { once: true });
-document.addEventListener('touchstart', startBGM, { once: true });
+// touchend 比 touchstart 更能通過 iOS 的限制
+document.addEventListener('touchend', unlockAudio, { once: true });
+document.addEventListener('click',    unlockAudio, { once: true });
 
 function toggleBGM() {
   bgmMuted = !bgmMuted;
@@ -550,6 +553,15 @@ function calcDays(d) {
 
 // ── 初始化 ──
 window.addEventListener('DOMContentLoaded', async () => {
+  // 偵測 WebView（LINE、Instagram、Facebook 等）
+  const ua = navigator.userAgent || '';
+  const isWebView = /FBAN|FBAV|Instagram|Line\/|KAKAOTALK|MicroMessenger|WebView|(iPhone|iPod|iPad)(?!.*Safari)/.test(ua);
+  if (isWebView) {
+    document.getElementById('webview-notice').classList.remove('hidden');
+    document.getElementById('loading-screen').classList.add('hidden');
+    return;
+  }
+
   // auth state 監聽
   sbClient.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session && !currentUser) {
@@ -752,6 +764,13 @@ function selectKind(btn, kind) {
 function startSwiping() {
   cityFilter    = document.getElementById('city-sel').value;
   shelterFilter = document.getElementById('shelter-sel').value;
+  // 儲存篩選狀態，避免返回後消失
+  try {
+    sessionStorage.setItem('maoyuan_kind', kindFilter);
+    sessionStorage.setItem('maoyuan_city', cityFilter);
+    sessionStorage.setItem('maoyuan_shelter', shelterFilter);
+    sessionStorage.setItem('maoyuan_idx', '0');
+  } catch(e) {}
   applyFilters();
   renderActiveFilters();
   hide('filter-screen');
@@ -885,7 +904,8 @@ function buildCard(pet, layer) {
           <i class="ti ti-map-pin" style="font-size:11px;flex-shrink:0"></i>
           <span>${pet.city}${pet.shelterTel ? '・' + pet.shelterTel : ''}</span>
         </div>
-        <a class="detail-link" href="${pet.petUrl}" target="_blank" onclick="event.stopPropagation()">
+        <a class="detail-link" href="${pet.petUrl}" target="_blank"
+           onclick="event.stopPropagation(); event.preventDefault(); window.open('${pet.petUrl}','_blank','noopener');">
           詳細資訊 <i class="ti ti-external-link" style="font-size:11px"></i>
         </a>
       </div>
