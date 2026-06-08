@@ -389,10 +389,10 @@ select { font-family: inherit; outline: none; }
       <div class="filter-section">
         <div class="filter-section-label">物種</div>
         <div class="chip-row">
-          <button class="chip active" onclick="selectKind(this,'all')">全部</button>
-          <button class="chip" onclick="selectKind(this,'犬')">🐶 犬</button>
-          <button class="chip" onclick="selectKind(this,'貓')">🐱 貓</button>
-          <button class="chip" onclick="selectKind(this,'other')">🐾 其他</button>
+          <button class="chip active" data-kind="all" onclick="selectKind(this,'all')">全部</button>
+          <button class="chip" data-kind="犬" onclick="selectKind(this,'犬')">🐶 犬</button>
+          <button class="chip" data-kind="貓" onclick="selectKind(this,'貓')">🐱 貓</button>
+          <button class="chip" data-kind="other" onclick="selectKind(this,'other')">🐾 其他</button>
         </div>
       </div>
 
@@ -562,7 +562,22 @@ window.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // auth state 監聽
+  // 先嘗試從 URL hash 處理 OAuth 回調（手機回調常走這條路）
+  const hash = window.location.hash;
+  if (hash && (hash.includes('access_token') || hash.includes('error_description'))) {
+    // 讓 Supabase 解析 hash
+    const { data: { session }, error } = await sbClient.auth.getSession();
+    window.history.replaceState({}, '', window.location.pathname);
+    hide('loading-screen');
+    if (session) {
+      currentUser = session.user;
+      await initApp();
+      return;
+    }
+    if (error) { show('auth-screen'); return; }
+  }
+
+  // auth state 監聽（處理一般登入狀態變化）
   sbClient.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session && !currentUser) {
       if (window.location.hash.includes('access_token'))
@@ -582,12 +597,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // 一般頁面載入：檢查既有 session
   const { data: { session } } = await sbClient.auth.getSession();
   hide('loading-screen');
   if (session) {
     currentUser = session.user;
     await initApp();
-  } else if (!window.location.hash.includes('access_token')) {
+  } else {
     show('auth-screen');
   }
 });
@@ -675,6 +691,7 @@ async function loadPetsForFilter() {
     console.log('縣市選單建立完成');
     document.getElementById('filter-loading-note').classList.add('hidden');
     document.getElementById('start-btn').disabled = false;
+    restoreSwipeState();
   } catch(e) {
     console.error('Worker fetch error:', e);
     // Try direct fetch as fallback
@@ -764,17 +781,39 @@ function selectKind(btn, kind) {
 function startSwiping() {
   cityFilter    = document.getElementById('city-sel').value;
   shelterFilter = document.getElementById('shelter-sel').value;
-  // 儲存篩選狀態，避免返回後消失
   try {
     sessionStorage.setItem('maoyuan_kind', kindFilter);
     sessionStorage.setItem('maoyuan_city', cityFilter);
     sessionStorage.setItem('maoyuan_shelter', shelterFilter);
-    sessionStorage.setItem('maoyuan_idx', '0');
+    sessionStorage.setItem('maoyuan_state', 'swiping');
   } catch(e) {}
   applyFilters();
   renderActiveFilters();
   hide('filter-screen');
   show('swipe-screen');
+}
+
+// 返回時恢復滑卡頁狀態
+function restoreSwipeState() {
+  try {
+    const state = sessionStorage.getItem('maoyuan_state');
+    if (state !== 'swiping' || !petsLoaded) return;
+    const k = sessionStorage.getItem('maoyuan_kind');
+    const c = sessionStorage.getItem('maoyuan_city');
+    const s = sessionStorage.getItem('maoyuan_shelter');
+    if (k) kindFilter = k;
+    if (c) cityFilter = c;
+    if (s) shelterFilter = s;
+    // 恢復物種選擇按鈕
+    document.querySelectorAll('.chip').forEach(b => {
+      b.classList.toggle('active', b.dataset.kind === kindFilter ||
+        (kindFilter === 'all' && b.dataset.kind === 'all'));
+    });
+    applyFilters();
+    renderActiveFilters();
+    hide('filter-screen');
+    show('swipe-screen');
+  } catch(e) {}
 }
 
 function applyFilters() {
