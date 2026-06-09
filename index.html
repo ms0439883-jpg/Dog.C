@@ -810,6 +810,12 @@ function restoreSwipeState() {
         (kindFilter === 'all' && b.dataset.kind === 'all'));
     });
     applyFilters();
+    // 恢復卡片位置
+    const savedIdx = parseInt(sessionStorage.getItem('maoyuan_idx') || '0');
+    if (savedIdx > 0 && savedIdx < filteredPets.length) {
+      currentIndex = savedIdx;
+      renderStack();
+    }
     renderActiveFilters();
     hide('filter-screen');
     show('swipe-screen');
@@ -1068,6 +1074,7 @@ async function doSwipe(dir) {
     playSad();
   }
   currentIndex++;
+  try { sessionStorage.setItem('maoyuan_idx', String(currentIndex)); } catch(e) {}
   setTimeout(renderStack, 360);
 }
 
