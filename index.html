@@ -809,13 +809,34 @@ function restoreSwipeState() {
       b.classList.toggle('active', b.dataset.kind === kindFilter ||
         (kindFilter === 'all' && b.dataset.kind === 'all'));
     });
-    applyFilters();
+    // 先用一般篩選建立 filteredPets
+    filteredPets = allPets.filter(p => {
+      if (kindFilter !== 'all') {
+        if (kindFilter === 'other' && (p.kind === '犬' || p.kind === '貓')) return false;
+        if (kindFilter !== 'other' && p.kind !== kindFilter) return false;
+      }
+      if (cityFilter !== 'all' && p.city !== cityFilter) return false;
+      if (shelterFilter !== 'all' && p.shelter !== shelterFilter) return false;
+      return true;
+    });
+
+    // 嘗試用儲存的順序恢復
+    const savedOrder = sessionStorage.getItem('maoyuan_order');
+    if (savedOrder) {
+      const ids = savedOrder.split(',');
+      const petMap = {};
+      filteredPets.forEach(p => { petMap[p.id] = p; });
+      const ordered = ids.map(id => petMap[id]).filter(Boolean);
+      // 如果順序完整（筆數吻合），就用儲存的順序
+      if (ordered.length === filteredPets.length) {
+        filteredPets = ordered;
+      }
+    }
+
     // 恢復卡片位置
     const savedIdx = parseInt(sessionStorage.getItem('maoyuan_idx') || '0');
-    if (savedIdx > 0 && savedIdx < filteredPets.length) {
-      currentIndex = savedIdx;
-      renderStack();
-    }
+    currentIndex = (savedIdx > 0 && savedIdx < filteredPets.length) ? savedIdx : 0;
+    renderStack();
     renderActiveFilters();
     hide('filter-screen');
     show('swipe-screen');
@@ -837,6 +858,11 @@ function applyFilters() {
     [filteredPets[i], filteredPets[j]] = [filteredPets[j], filteredPets[i]];
   }
   currentIndex = 0;
+  // 儲存打亂後的 id 順序，供返回時恢復
+  try {
+    const ids = filteredPets.map(p => p.id).join(',');
+    sessionStorage.setItem('maoyuan_order', ids);
+  } catch(e) {}
   renderStack();
 }
 
