@@ -831,15 +831,19 @@ function restoreSwipeState() {
       const petMap = {};
       filteredPets.forEach(p => { petMap[p.id] = p; });
       const ordered = ids.map(id => petMap[id]).filter(Boolean);
-      // 如果順序完整（筆數吻合），就用儲存的順序
-      if (ordered.length === filteredPets.length) {
+      // 只要有對應到資料就用儲存順序（API 資料筆數每天會變動）
+      if (ordered.length > 0) {
         filteredPets = ordered;
+        console.log('[restore] 使用儲存順序，筆數:', ordered.length);
+      } else {
+        console.log('[restore] 儲存順序對不上，重新排列');
       }
     }
 
     // 恢復卡片位置
     const savedIdx = parseInt(sessionStorage.getItem('maoyuan_idx') || '0');
     currentIndex = (savedIdx > 0 && savedIdx < filteredPets.length) ? savedIdx : 0;
+    console.log('[restore] 恢復到 index:', currentIndex, '/ 總筆數:', filteredPets.length);
     renderStack();
     renderActiveFilters();
     hide('filter-screen');
