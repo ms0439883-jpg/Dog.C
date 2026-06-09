@@ -786,7 +786,8 @@ function startSwiping() {
     sessionStorage.setItem('maoyuan_city', cityFilter);
     sessionStorage.setItem('maoyuan_shelter', shelterFilter);
     sessionStorage.setItem('maoyuan_state', 'swiping');
-  } catch(e) {}
+    console.log('[startSwiping] saved state to sessionStorage');
+  } catch(e) { console.error('[startSwiping] sessionStorage error:', e); }
   applyFilters();
   renderActiveFilters();
   hide('filter-screen');
@@ -797,6 +798,9 @@ function startSwiping() {
 function restoreSwipeState() {
   try {
     const state = sessionStorage.getItem('maoyuan_state');
+    console.log('[restore] state:', state, 'petsLoaded:', petsLoaded);
+    console.log('[restore] maoyuan_idx:', sessionStorage.getItem('maoyuan_idx'));
+    console.log('[restore] maoyuan_order length:', (sessionStorage.getItem('maoyuan_order')||'').split(',').length);
     if (state !== 'swiping' || !petsLoaded) return;
     const k = sessionStorage.getItem('maoyuan_kind');
     const c = sessionStorage.getItem('maoyuan_city');
@@ -862,6 +866,7 @@ function applyFilters() {
   try {
     const ids = filteredPets.map(p => p.id).join(',');
     sessionStorage.setItem('maoyuan_order', ids);
+    console.log('[applyFilters] saved order, count:', filteredPets.length);
   } catch(e) {}
   renderStack();
 }
@@ -1100,7 +1105,10 @@ async function doSwipe(dir) {
     playSad();
   }
   currentIndex++;
-  try { sessionStorage.setItem('maoyuan_idx', String(currentIndex)); } catch(e) {}
+  try {
+    sessionStorage.setItem('maoyuan_idx', String(currentIndex));
+    console.log('[doSwipe] saved idx:', currentIndex);
+  } catch(e) {}
   setTimeout(renderStack, 360);
 }
 
